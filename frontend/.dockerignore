@@ -1,0 +1,23 @@
+# Dependencies and build output are produced inside the image.
+node_modules
+dist
+dist-ssr
+
+# Local env — not needed at build time (VITE_* come in as build args) and must
+# never enter an image layer.
+.env
+.env.*
+!.env.example
+.env.local
+
+# VCS, tooling, and editor noise.
+.git
+.gitignore
+.dockerignore
+Dockerfile
+
+
+# Logs and OS cruft.
+*.log
+npm-debug.log*
+.DS_Store

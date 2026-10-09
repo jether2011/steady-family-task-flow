@@ -1,0 +1,18 @@
+# Root-level ignore for compose builds. Each service build also has its own
+# .dockerignore scoped to its context (./backend, ./frontend).
+.git
+.gitignore
+.DS_Store
+
+# Secrets / local env must never enter any build context.
+.env
+.env.*
+!.env.example
+
+# Spec/tooling metadata, not needed by any image.
+.kiro
+
+# Nested dependency / build artifacts.
+**/node_modules
+**/dist
+**/*.log

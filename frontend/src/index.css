@@ -1,0 +1,165 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 40 20% 98%;
+    --foreground: 229 22% 13%;
+    --card: 0 0% 100%;
+    --card-foreground: 229 22% 13%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 229 22% 13%;
+    --primary: 243 75% 59%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 40 20% 93%;
+    --secondary-foreground: 229 22% 13%;
+    --muted: 40 23% 93%;
+    /* Darkened from 230 7% 45% so muted/secondary text stays >= 4.5:1 on every
+       surface it is used on (background, card, muted, accent) per R31.2. */
+    --muted-foreground: 230 8% 42%;
+    --accent: 244 64% 96%;
+    --accent-foreground: 243 75% 40%;
+    --destructive: 0 78% 59%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 160 84% 39%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    --info: 199 89% 48%;
+    --info-foreground: 0 0% 100%;
+    --border: 40 25% 89%;
+    --input: 40 25% 89%;
+    --ring: 243 75% 59%;
+    --chart-1: 243 75% 59%;
+    --chart-2: 160 84% 39%;
+    --chart-3: 38 92% 50%;
+    --chart-4: 199 89% 48%;
+    --chart-5: 280 65% 60%;
+    --radius: 0.875rem;
+    --font-heading: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+    --font-body: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+    --font-display: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 229 22% 13%;
+    --sidebar-primary: 243 75% 59%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 244 64% 96%;
+    --sidebar-accent-foreground: 243 75% 40%;
+    --sidebar-border: 40 25% 89%;
+    --sidebar-ring: 243 75% 59%;
+  }
+
+  .dark {
+    --background: 229 35% 8%;
+    --foreground: 40 20% 96%;
+    --card: 229 30% 11%;
+    --card-foreground: 40 20% 96%;
+    --popover: 229 30% 11%;
+    --popover-foreground: 40 20% 96%;
+    --primary: 243 75% 68%;
+    --primary-foreground: 229 35% 8%;
+    --secondary: 229 20% 18%;
+    --secondary-foreground: 40 20% 96%;
+    --muted: 229 20% 16%;
+    --muted-foreground: 230 10% 65%;
+    --accent: 243 40% 22%;
+    --accent-foreground: 244 64% 90%;
+    --destructive: 0 78% 64%;
+    --destructive-foreground: 229 35% 8%;
+    --success: 160 70% 50%;
+    --success-foreground: 229 35% 8%;
+    --warning: 38 92% 58%;
+    --warning-foreground: 229 35% 8%;
+    --info: 199 89% 58%;
+    --info-foreground: 229 35% 8%;
+    --border: 229 20% 20%;
+    --input: 229 20% 20%;
+    --ring: 243 75% 68%;
+    --chart-1: 243 75% 68%;
+    --chart-2: 160 70% 50%;
+    --chart-3: 38 92% 58%;
+    --chart-4: 199 89% 58%;
+    --chart-5: 280 70% 70%;
+    --sidebar-background: 229 30% 11%;
+    --sidebar-foreground: 40 20% 96%;
+    --sidebar-primary: 243 75% 68%;
+    --sidebar-primary-foreground: 229 35% 8%;
+    --sidebar-accent: 243 40% 22%;
+    --sidebar-accent-foreground: 244 64% 90%;
+    --sidebar-border: 229 20% 20%;
+    --sidebar-ring: 243 75% 68%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground font-body antialiased;
+  }
+
+  /*
+   * Keyboard navigation + visible focus indicator for every interactive
+   * control (R31.1). Many bespoke buttons/links in Wall Mode and across the
+   * app do not use the shared Button component, so this guarantees a visible
+   * ring on keyboard focus without affecting mouse interaction (:focus-visible
+   * only triggers for keyboard/non-pointer focus). Interactive controls can
+   * still opt into a custom ring; this is the baseline fallback.
+   */
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+    border-radius: var(--radius);
+  }
+}
+
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 9999px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+/*
+ * Suppress non-essential animation app-wide (and therefore in Wall Mode) when
+ * the device reports prefers-reduced-motion (R19.3 / R31.4). Animations are
+ * collapsed to a single, effectively-instant frame — looping animations
+ * (spinners, pulses) stop after one iteration, transitions snap, and scroll
+ * jumps instead of smooth-scrolling. framer-motion honours the same OS setting
+ * natively via its reduced-motion support.
+ */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto !important;
+  }
+
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

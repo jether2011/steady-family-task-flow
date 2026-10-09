@@ -1,0 +1,23 @@
+# Dependencies and build output are reproduced inside the image; never copy
+# the host's versions in (keeps the build cache clean and the image small).
+node_modules
+dist
+
+# Secrets and local env — MUST never enter an image layer (R29.4).
+.env
+.env.*
+!.env.example
+
+# VCS, tooling, and editor noise.
+.git
+.gitignore
+.dockerignore
+Dockerfile
+
+# Tests and coverage artifacts are not needed at runtime.
+coverage
+*.log
+npm-debug.log*
+
+# OS cruft.
+.DS_Store

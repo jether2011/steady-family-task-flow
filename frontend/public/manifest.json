@@ -1,0 +1,12 @@
+{
+  "name": "Family Task Board",
+  "short_name": "TaskBoard",
+  "description": "A family chore and reward board.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#4F46E5",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

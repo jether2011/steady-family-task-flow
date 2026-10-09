@@ -1,0 +1,58 @@
+# =============================================================================
+# Root Docker Compose — orchestrates the backend and frontend together (R29.3).
+#
+# All configuration is injected from the environment / a root `.env` file via
+# ${VAR} interpolation (R29.4). Nothing privileged is hardcoded here — in
+# particular the Supabase service-role key is only referenced by name and is
+# supplied at `docker compose up` time (see .env.example).
+#
+# Each service is also independently deployable with its own Dockerfile and
+# config (R29.10).
+#
+#   cp .env.example .env   # fill in real values, then:
+#   docker compose up --build
+# =============================================================================
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    # Config comes from the environment / root .env (R29.4). The service-role
+    # key is interpolated from the host — never a literal value in this file.
+    environment:
+      PORT: 8080
+      NODE_ENV: production
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      CORS_ORIGIN: ${CORS_ORIGIN}
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:8080/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      # VITE_* are build-time (R29.7); interpolated from env, baked into bundle.
+      # Only public values — the service-role key is never passed here (R29.4).
+      args:
+        VITE_API_URL: ${VITE_API_URL}
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
+    ports:
+      - "5173:8080"
+    depends_on:
+      - backend          # R29.3
+    restart: unless-stopped

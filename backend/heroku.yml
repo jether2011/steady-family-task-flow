@@ -1,0 +1,18 @@
+# Heroku container deploy manifest for the Family Task Board backend.
+#
+# With the app's stack set to "container" (heroku stack:set container), Heroku
+# builds the image from the Dockerfile in this directory and runs it as the
+# `web` process. The server already binds to 0.0.0.0:$PORT (Heroku injects
+# $PORT), honored by src/config/env.ts.
+#
+# Set runtime config separately (never commit secrets):
+#   heroku config:set NODE_ENV=production SUPABASE_URL=... \
+#     SUPABASE_ANON_KEY=... SUPABASE_SERVICE_ROLE_KEY=... \
+#     CORS_ORIGIN=https://your-frontend-domain
+#
+# Then deploy:  git push heroku main
+build:
+  docker:
+    web: Dockerfile
+run:
+  web: node dist/server.js
