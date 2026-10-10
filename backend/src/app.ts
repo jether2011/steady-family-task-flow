@@ -133,6 +133,7 @@ export function buildApp(): FastifyInstance {
   const corsOptions: FastifyCorsOptions = {
     origin: resolveCorsOrigin(),
     credentials: true,
+    methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   };
   void app.register(cors, corsOptions);
 
