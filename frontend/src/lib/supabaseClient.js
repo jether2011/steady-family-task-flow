@@ -11,23 +11,23 @@
 //
 // Configuration comes from Vite build-time env vars (R24.6 / R29.7):
 //   VITE_SUPABASE_URL       — the project URL, e.g. https://xyz.supabase.co
-//   VITE_SUPABASE_ANON_KEY  — the public anon key (safe to ship to the browser)
+//   VITE_SUPABASE_PUBLISHABLE_KEY — the publishable key (safe to ship to the browser)
 
 import { createClient } from '@supabase/supabase-js';
 
 // Read Vite build-time env without depending on ambient `vite/client` types
 // (keeps this module self-contained, matching the approach in `@/api/client`).
-/** @type {{ VITE_SUPABASE_URL?: string, VITE_SUPABASE_ANON_KEY?: string }} */
+/** @type {{ VITE_SUPABASE_URL?: string, VITE_SUPABASE_PUBLISHABLE_KEY?: string }} */
 const env = /** @type {any} */ (import.meta).env ?? {};
 const supabaseUrl = env.VITE_SUPABASE_URL;
-const supabaseAnonKey = env.VITE_SUPABASE_ANON_KEY;
+const supabasePublishableKey = env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-if (!supabaseUrl || !supabaseAnonKey) {
+if (!supabaseUrl || !supabasePublishableKey) {
   // Fail loud in dev so a missing env var doesn't turn into a confusing
   // "no session" at runtime. The message intentionally names the keys, not
   // their values, so nothing secret is logged.
   console.error(
-    '[supabaseClient] Missing VITE_SUPABASE_URL and/or VITE_SUPABASE_ANON_KEY. ' +
+    '[supabaseClient] Missing VITE_SUPABASE_URL and/or VITE_SUPABASE_PUBLISHABLE_KEY. ' +
       'Set them in the frontend environment (.env.local) before building.',
   );
 }
@@ -38,7 +38,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
  * complete the OAuth redirect (parsing the token out of the callback URL) so
  * `onAuthStateChange` fires once Google sends the user back.
  */
-export const supabase = createClient(supabaseUrl ?? '', supabaseAnonKey ?? '', {
+export const supabase = createClient(supabaseUrl ?? '', supabasePublishableKey ?? '', {
   auth: {
     persistSession: true,
     autoRefreshToken: true,

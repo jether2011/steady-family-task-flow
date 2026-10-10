@@ -22,17 +22,17 @@ beforeAll(async () => {
   process.env.PORT = '8080';
   process.env.NODE_ENV = 'test';
   process.env.SUPABASE_URL = 'https://bootstrap.supabase.co';
-  process.env.SUPABASE_ANON_KEY = 'bootstrap-anon';
-  process.env.SUPABASE_SERVICE_ROLE_KEY = 'bootstrap-service-role';
+  process.env.SUPABASE_PUBLISHABLE_KEY = 'bootstrap-publishable';
+  process.env.SUPABASE_SECRET_KEY = 'bootstrap-secret';
   process.env.CORS_ORIGIN = 'https://bootstrap.example.com';
 
   ({ parseEnv } = await import('../../src/config/env.js'));
 });
 
-// A deliberately recognizable fake service-role secret. If this ever appears in
-// a thrown error message the secret-free guarantee (R29.9) has been violated.
-const SAMPLE_SERVICE_ROLE = 'sk-super-secret-service-role-value-123456';
-const SAMPLE_ANON_KEY = 'anon-secret-value-abcdef';
+// A deliberately recognizable fake secret key. If this ever appears in a thrown
+// error message the secret-free guarantee (R29.9) has been violated.
+const SAMPLE_SECRET_KEY = 'sb_secret_super-secret-value-123456';
+const SAMPLE_PUBLISHABLE_KEY = 'sb_publishable_value-abcdef';
 
 /** Build a complete, valid env source, optionally overriding fields. */
 function validSource(
@@ -42,8 +42,8 @@ function validSource(
     PORT: '3000',
     NODE_ENV: 'test',
     SUPABASE_URL: 'https://project.supabase.co',
-    SUPABASE_ANON_KEY: SAMPLE_ANON_KEY,
-    SUPABASE_SERVICE_ROLE_KEY: SAMPLE_SERVICE_ROLE,
+    SUPABASE_PUBLISHABLE_KEY: SAMPLE_PUBLISHABLE_KEY,
+    SUPABASE_SECRET_KEY: SAMPLE_SECRET_KEY,
     CORS_ORIGIN: 'https://a.example.com, https://b.example.com',
   };
   const merged: Record<string, string | undefined> = { ...base, ...overrides };
@@ -101,12 +101,12 @@ describe('parseEnv — missing required var', () => {
 
     expect(message).not.toBe('');
     expect(message).toContain('SUPABASE_URL');
-    expect(message).not.toContain(SAMPLE_SERVICE_ROLE);
-    expect(message).not.toContain(SAMPLE_ANON_KEY);
+    expect(message).not.toContain(SAMPLE_SECRET_KEY);
+    expect(message).not.toContain(SAMPLE_PUBLISHABLE_KEY);
   });
 
   it('names the key when a secret var itself is missing, without a value', () => {
-    const source = validSource({ SUPABASE_SERVICE_ROLE_KEY: undefined });
+    const source = validSource({ SUPABASE_SECRET_KEY: undefined });
     let message = '';
     try {
       parseEnv(source);
@@ -114,8 +114,8 @@ describe('parseEnv — missing required var', () => {
       message = error instanceof Error ? error.message : String(error);
     }
 
-    expect(message).toContain('SUPABASE_SERVICE_ROLE_KEY');
-    expect(message).not.toContain(SAMPLE_SERVICE_ROLE);
+    expect(message).toContain('SUPABASE_SECRET_KEY');
+    expect(message).not.toContain(SAMPLE_SECRET_KEY);
   });
 });
 

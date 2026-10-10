@@ -7,7 +7,7 @@
 #
 # Set runtime config separately (never commit secrets):
 #   heroku config:set NODE_ENV=production SUPABASE_URL=... \
-#     SUPABASE_ANON_KEY=... SUPABASE_SERVICE_ROLE_KEY=... \
+#     SUPABASE_PUBLISHABLE_KEY=... SUPABASE_SECRET_KEY=... \
 #     CORS_ORIGIN=https://your-frontend-domain
 #
 # Then deploy:  git push heroku main

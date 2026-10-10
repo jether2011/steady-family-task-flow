@@ -70,15 +70,19 @@ const REDACT_PATHS: readonly string[] = [
   '*.id_token',
   '*.*.token',
 
-  // --- Service-role key / anon key material (`*.service_role*` and env names) ---
+  // --- Secret / publishable key material (current + legacy env names) ---
   'service_role',
   'service_role_key',
   'serviceRoleKey',
+  'SUPABASE_SECRET_KEY',
+  'SUPABASE_PUBLISHABLE_KEY',
   'SUPABASE_SERVICE_ROLE_KEY',
   'SUPABASE_ANON_KEY',
   '*.service_role',
   '*.service_role_key',
   '*.serviceRoleKey',
+  '*.SUPABASE_SECRET_KEY',
+  '*.SUPABASE_PUBLISHABLE_KEY',
   '*.SUPABASE_SERVICE_ROLE_KEY',
   '*.SUPABASE_ANON_KEY',
 

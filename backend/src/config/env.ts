@@ -14,8 +14,15 @@ import { z } from 'zod';
  *
  * - `PORT` is coerced from its string representation to a positive integer.
  * - `NODE_ENV` defaults to `development` so local runs need no extra setup.
- * - The Supabase trio and `CORS_ORIGIN` are required, non-empty strings.
+ * - The Supabase keys and `CORS_ORIGIN` are required, non-empty strings.
  *   `SUPABASE_URL` must additionally be a valid URL.
+ * - `SUPABASE_PUBLISHABLE_KEY` / `SUPABASE_SECRET_KEY` are the current Supabase
+ *   API keys (`sb_publishable_...` / `sb_secret_...`) that replace the legacy
+ *   `anon` / `service_role` keys. They are drop-in replacements for
+ *   `createClient(url, key)` and the JWKS-based JWT verification path.
+ * - `SUPABASE_JWKS_URL` is OPTIONAL: when unset the backend derives the JWKS
+ *   endpoint from `SUPABASE_URL` (`${SUPABASE_URL}/auth/v1/.well-known/jwks.json`).
+ *   Set it only to point verification at a non-default JWKS location.
  */
 const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(8080),
@@ -23,8 +30,9 @@ const envSchema = z.object({
     .enum(['development', 'test', 'production'])
     .default('development'),
   SUPABASE_URL: z.string().min(1).url(),
-  SUPABASE_ANON_KEY: z.string().min(1),
-  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
+  SUPABASE_PUBLISHABLE_KEY: z.string().min(1),
+  SUPABASE_SECRET_KEY: z.string().min(1),
+  SUPABASE_JWKS_URL: z.string().url().optional(),
   CORS_ORIGIN: z.string().min(1),
 });
 
@@ -39,8 +47,8 @@ export type Env = z.infer<typeof envSchema> & {
  * or error messages — only the key name is ever surfaced (R23.5, R29.9).
  */
 const SECRET_KEYS = new Set([
-  'SUPABASE_ANON_KEY',
-  'SUPABASE_SERVICE_ROLE_KEY',
+  'SUPABASE_PUBLISHABLE_KEY',
+  'SUPABASE_SECRET_KEY',
 ]);
 
 /**

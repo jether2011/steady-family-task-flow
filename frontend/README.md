@@ -26,7 +26,7 @@ cp .env.example .env     # 1. create your env file
 # 2. edit .env:
 #    VITE_API_URL=http://localhost:8080
 #    VITE_SUPABASE_URL=https://your-project-ref.supabase.co
-#    VITE_SUPABASE_ANON_KEY=your-anon-key
+#    VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_your-key
 npm install              # 3. install dependencies
 npm run dev               # 4. start Vite on http://localhost:5173
 ```
@@ -35,13 +35,13 @@ Open http://localhost:5173 and sign in with Google. For login to work, the Supab
 
 ## Environment variables
 
-All frontend variables are build-time (Vite `import.meta.env.VITE_*`) and are baked into the static bundle, so a rebuild is required when they change. Only public values belong here - never put the Supabase service-role key in the frontend.
+All frontend variables are build-time (Vite `import.meta.env.VITE_*`) and are baked into the static bundle, so a rebuild is required when they change. Only public values belong here - never put the Supabase secret key in the frontend.
 
 | Variable | Required | Description |
 | --- | --- | --- |
 | `VITE_API_URL` | yes | Base URL of the backend as seen by the browser (e.g. `http://localhost:8080` or your API domain) |
 | `VITE_SUPABASE_URL` | yes | Supabase project URL |
-| `VITE_SUPABASE_ANON_KEY` | yes | Supabase anon (public) key - safe to ship to the browser |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | yes | Supabase publishable (public) key `sb_publishable_...` - safe to ship to the browser |
 
 ## npm scripts
 
@@ -69,7 +69,7 @@ The `Dockerfile` is multi-stage: it runs `vite build` then serves the static fil
 docker build \
   --build-arg VITE_API_URL=https://your-api-domain \
   --build-arg VITE_SUPABASE_URL=https://your-project-ref.supabase.co \
-  --build-arg VITE_SUPABASE_ANON_KEY=your-anon-key \
+  --build-arg VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_your-key \
   -t ftb-frontend ./
 docker run --rm -p 5173:8080 ftb-frontend
 ```
@@ -88,7 +88,7 @@ vercel login
 vercel            # first run links/creates the project (set the root to frontend/)
 ```
 
-In the Vercel dashboard (Project -> Settings -> Environment Variables), add `VITE_API_URL`, `VITE_SUPABASE_URL`, and `VITE_SUPABASE_ANON_KEY`. Vercel auto-detects Vite (build `npm run build`, output `dist`). Then ship production:
+In the Vercel dashboard (Project -> Settings -> Environment Variables), add `VITE_API_URL`, `VITE_SUPABASE_URL`, and `VITE_SUPABASE_PUBLISHABLE_KEY`. Vercel auto-detects Vite (build `npm run build`, output `dist`). Then ship production:
 
 ```bash
 vercel --prod
@@ -108,7 +108,7 @@ heroku create your-ftb-frontend
 docker build \
   --build-arg VITE_API_URL=https://your-ftb-backend.herokuapp.com \
   --build-arg VITE_SUPABASE_URL=https://your-project-ref.supabase.co \
-  --build-arg VITE_SUPABASE_ANON_KEY=your-anon-key \
+  --build-arg VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_your-key \
   -t registry.heroku.com/your-ftb-frontend/web .
 
 docker push registry.heroku.com/your-ftb-frontend/web
@@ -129,7 +129,7 @@ git clone <your-repo-url> && cd <repo>/frontend
 docker build \
   --build-arg VITE_API_URL=https://api.your-domain.com \
   --build-arg VITE_SUPABASE_URL=https://your-project-ref.supabase.co \
-  --build-arg VITE_SUPABASE_ANON_KEY=your-anon-key \
+  --build-arg VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_your-key \
   -t ftb-frontend .
 docker run -d --name ftb-frontend --restart unless-stopped -p 8080:8080 ftb-frontend
 ```

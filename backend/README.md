@@ -1,6 +1,6 @@
 # Family Task Board - Backend
 
-A Node.js + TypeScript REST API built on Fastify 5, backed by a hosted Supabase (PostgreSQL) project. It verifies Supabase-issued JWTs, resolves each caller's family, and owns all privileged writes - the points ledger runs through atomic PostgreSQL functions invoked with the Supabase service-role key. Reads additionally rely on row-level security.
+A Node.js + TypeScript REST API built on Fastify 5, backed by a hosted Supabase (PostgreSQL) project. It verifies Supabase-issued JWTs, resolves each caller's family, and owns all privileged writes - the points ledger runs through atomic PostgreSQL functions invoked with the Supabase secret key. Reads additionally rely on row-level security.
 
 - Base path: `/api/v1`
 - Interactive API docs (OpenAPI): `/api/docs`
@@ -24,7 +24,7 @@ A Node.js + TypeScript REST API built on Fastify 5, backed by a hosted Supabase 
 cd backend
 cp .env.example .env     # 1. create your env file
 # 2. edit .env and fill in the real Supabase values:
-#    SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, CORS_ORIGIN
+#    SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, SUPABASE_SECRET_KEY, CORS_ORIGIN
 npm install              # 3. install dependencies
 npm run dev               # 4. start the dev server (tsx watch) on http://localhost:8080
 ```
@@ -45,8 +45,9 @@ The server fails fast with a clear, secret-free error if any required env var is
 | `PORT` | no | `8080` | Port the server binds to (0.0.0.0:PORT) |
 | `NODE_ENV` | no | `development` | `development` / `test` / `production`. In production CORS rejects wildcards. |
 | `SUPABASE_URL` | yes | - | Supabase project URL |
-| `SUPABASE_ANON_KEY` | yes | - | Public anon key (user-scoped requests) |
-| `SUPABASE_SERVICE_ROLE_KEY` | yes | - | Privileged key for atomic ledger writes. Backend only - never expose. |
+| `SUPABASE_PUBLISHABLE_KEY` | yes | - | Publishable (public) key `sb_publishable_...` for user-scoped requests. (Replaces the legacy anon key.) |
+| `SUPABASE_SECRET_KEY` | yes | - | Secret key `sb_secret_...` for atomic ledger writes. Backend only - never expose. (Replaces the legacy service_role key.) |
+| `SUPABASE_JWKS_URL` | no | derived from `SUPABASE_URL` | Optional override of the JWKS endpoint used to verify user JWTs. |
 | `CORS_ORIGIN` | yes | - | Comma-separated allowed origins, no trailing slash. No wildcard in production. |
 
 `.env` is git-ignored and is never baked into the Docker image.
@@ -128,7 +129,7 @@ heroku create your-ftb-backend                 # creates the app + git remote
 
 # set config (never commit these)
 heroku config:set NODE_ENV=production \
-  SUPABASE_URL=... SUPABASE_ANON_KEY=... SUPABASE_SERVICE_ROLE_KEY=... \
+  SUPABASE_URL=... SUPABASE_PUBLISHABLE_KEY=... SUPABASE_SECRET_KEY=... \
   CORS_ORIGIN=https://your-frontend-domain -a your-ftb-backend
 
 # build, push, and release the container (run from backend/)

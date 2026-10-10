@@ -42,8 +42,8 @@ vi.hoisted(() => {
   process.env.PORT ??= '8080';
   process.env.NODE_ENV ??= 'test';
   process.env.SUPABASE_URL ??= 'https://project.supabase.co';
-  process.env.SUPABASE_ANON_KEY ??= 'anon-test-key';
-  process.env.SUPABASE_SERVICE_ROLE_KEY ??= 'service-role-test-key';
+  process.env.SUPABASE_PUBLISHABLE_KEY ??= 'sb_publishable_test-key';
+  process.env.SUPABASE_SECRET_KEY ??= 'sb_secret_test-key';
   process.env.CORS_ORIGIN ??= 'https://app.example.com';
 });
 

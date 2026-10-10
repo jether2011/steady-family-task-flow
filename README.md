@@ -21,7 +21,7 @@ Browser ->|   frontend   | ------------------> |   backend    |
           | (React SPA)  |   REST /api/v1      |  (Fastify)   |
           +------+-------+                     +------+-------+
                  | Google OAuth + realtime            | service-role
-                 | (anon key)                         | (privileged)
+                 | (publishable key)                  | (privileged)
                  v                                    v
           +---------------------------------------------------+
           |                     Supabase                      |
@@ -30,7 +30,7 @@ Browser ->|   frontend   | ------------------> |   backend    |
 ```
 
 - The frontend signs users in with Supabase Google OAuth and sends the resulting JWT as a Bearer token to the backend. It subscribes to Supabase Realtime for live board updates.
-- The backend verifies the JWT against Supabase's JWKS, resolves the caller's family, and performs all privileged writes (the points ledger uses atomic PostgreSQL functions) using the Supabase service-role key. Row-level security is a second isolation guarantee for reads.
+- The backend verifies the JWT against Supabase's JWKS, resolves the caller's family, and performs all privileged writes (the points ledger uses atomic PostgreSQL functions) using the Supabase secret key. Row-level security is a second isolation guarantee for reads.
 
 ---
 
@@ -49,8 +49,8 @@ Everything the apps need in code is in this repo, but a Supabase project must be
 1. Create the project. Sign in at [supabase.com](https://supabase.com), create a new project, and wait for it to provision.
 2. Grab the keys. In the dashboard, go to Project Settings -> API and copy:
    - Project URL -> used as `SUPABASE_URL` / `VITE_SUPABASE_URL`
-   - anon public key -> `SUPABASE_ANON_KEY` / `VITE_SUPABASE_ANON_KEY` (safe to expose to the browser)
-   - service_role key -> `SUPABASE_SERVICE_ROLE_KEY` (secret - backend only, never ship to the browser or commit it)
+   - publishable key (`sb_publishable_...`) -> `SUPABASE_PUBLISHABLE_KEY` / `VITE_SUPABASE_PUBLISHABLE_KEY` (safe to expose to the browser; replaces the legacy anon key)
+   - secret key (`sb_secret_...`) -> `SUPABASE_SECRET_KEY` (secret - backend only, never ship to the browser or commit it; replaces the legacy service_role key)
 3. Enable Google OAuth. Go to Authentication -> Providers -> Google, toggle it on, and paste a Google OAuth Client ID and Client Secret (created in the [Google Cloud Console](https://console.cloud.google.com/) under APIs & Services -> Credentials -> OAuth client ID -> Web application). In the Google credential, add Supabase's callback URL (`https://<your-project-ref>.supabase.co/auth/v1/callback`) as an authorized redirect URI. In Authentication -> URL Configuration, set the Site URL to your frontend origin (e.g. `http://localhost:5173` for local dev).
 4. Apply the database schema. Run the SQL migrations and seed in order. The simplest path is the dashboard SQL Editor: open each file under `backend/src/supabase/migrations/` in numeric order (001 -> 006) and run it, then optionally run `backend/src/supabase/seed.sql` for demo data. The backend README also shows how to apply them with psql or the Supabase CLI.
 
@@ -97,13 +97,13 @@ npm run dev               # http://localhost:5173
 | Variable | Used by | Secret? | Notes |
 | --- | --- | --- | --- |
 | `SUPABASE_URL` | backend | no | Project URL |
-| `SUPABASE_ANON_KEY` | backend | no | Public anon key |
-| `SUPABASE_SERVICE_ROLE_KEY` | backend | yes | Privileged; backend only |
+| `SUPABASE_PUBLISHABLE_KEY` | backend | no | Publishable (public) key, `sb_publishable_...` |
+| `SUPABASE_SECRET_KEY` | backend | **yes** | Secret key `sb_secret_...`; privileged; backend only |
 | `CORS_ORIGIN` | backend | no | Allowed frontend origin(s); no wildcard in production |
 | `PORT` / `NODE_ENV` | backend | no | Defaults to 8080 / development |
 | `VITE_API_URL` | frontend | no | Backend base URL as seen by the browser |
 | `VITE_SUPABASE_URL` | frontend | no | Project URL |
-| `VITE_SUPABASE_ANON_KEY` | frontend | no | Public anon key, baked into the bundle |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | frontend | no | Publishable (public) key, baked into the bundle |
 
 The `VITE_*` values are build-time for the frontend (baked into the static bundle), so a rebuild is required whenever they change.
 

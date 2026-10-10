@@ -57,8 +57,8 @@ beforeAll(async () => {
   process.env.PORT ??= '8080';
   process.env.NODE_ENV ??= 'test';
   process.env.SUPABASE_URL ??= 'https://project.supabase.co';
-  process.env.SUPABASE_ANON_KEY ??= 'dummy-anon-key';
-  process.env.SUPABASE_SERVICE_ROLE_KEY ??= 'dummy-service-role-key';
+  process.env.SUPABASE_PUBLISHABLE_KEY ??= 'sb_publishable_dummy';
+  process.env.SUPABASE_SECRET_KEY ??= 'sb_secret_dummy';
   process.env.CORS_ORIGIN ??= 'https://app.example.com';
 
   ({ resolveCorsOrigin } = await import('../../src/app.js'));

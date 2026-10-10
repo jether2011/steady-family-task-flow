@@ -52,8 +52,17 @@ import './types.js';
  */
 const ISSUER = `${env.SUPABASE_URL}/auth/v1`;
 
-/** The project JWKS endpoint publishing the asymmetric signing public keys. */
-const JWKS_URL = new URL(`${env.SUPABASE_URL}/auth/v1/.well-known/jwks.json`);
+/**
+ * The project JWKS endpoint publishing the asymmetric signing public keys.
+ *
+ * Defaults to the standard Supabase location derived from `SUPABASE_URL`
+ * (`${SUPABASE_URL}/auth/v1/.well-known/jwks.json`). An explicit
+ * `SUPABASE_JWKS_URL` env var overrides it when verification must point at a
+ * non-default JWKS endpoint.
+ */
+const JWKS_URL = new URL(
+  env.SUPABASE_JWKS_URL ?? `${env.SUPABASE_URL}/auth/v1/.well-known/jwks.json`,
+);
 
 /**
  * Remote JWKS, created once and shared across requests. `jose` caches the keys

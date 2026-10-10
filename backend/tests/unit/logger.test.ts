@@ -23,8 +23,8 @@ vi.mock('../../src/config/env.js', () => ({
     PORT: 8080,
     NODE_ENV: 'test',
     SUPABASE_URL: 'https://example.supabase.co',
-    SUPABASE_ANON_KEY: 'anon',
-    SUPABASE_SERVICE_ROLE_KEY: 'service',
+    SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_test',
+    SUPABASE_SECRET_KEY: 'sb_secret_test',
     CORS_ORIGIN: 'http://localhost:5173',
     corsOrigins: ['http://localhost:5173'],
   },
@@ -39,8 +39,8 @@ function fakeEnv(nodeEnv: Env['NODE_ENV'] = 'test'): Env {
     PORT: 8080,
     NODE_ENV: nodeEnv,
     SUPABASE_URL: 'https://example.supabase.co',
-    SUPABASE_ANON_KEY: 'anon',
-    SUPABASE_SERVICE_ROLE_KEY: 'service',
+    SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_test',
+    SUPABASE_SECRET_KEY: 'sb_secret_test',
     CORS_ORIGIN: 'http://localhost:5173',
     corsOrigins: ['http://localhost:5173'],
   } as Env;
@@ -89,12 +89,13 @@ describe('buildLoggerOptions — redaction policy (R26.1)', () => {
     expect(paths).toContain('refresh_token');
   });
 
-  it('covers service-role / SUPABASE_SERVICE_ROLE_KEY material', () => {
+  it('covers secret / SUPABASE_SECRET_KEY material', () => {
     const paths = redactPaths();
     expect(paths).toContain('service_role');
-    expect(paths).toContain('SUPABASE_SERVICE_ROLE_KEY');
+    expect(paths).toContain('SUPABASE_SECRET_KEY');
+    expect(paths).toContain('SUPABASE_PUBLISHABLE_KEY');
     expect(paths).toContain('*.service_role');
-    expect(paths).toContain('*.SUPABASE_SERVICE_ROLE_KEY');
+    expect(paths).toContain('*.SUPABASE_SECRET_KEY');
   });
 
   it('covers cookie headers', () => {

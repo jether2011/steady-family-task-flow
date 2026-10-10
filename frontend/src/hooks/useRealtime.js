@@ -13,7 +13,7 @@ import { supabase } from '@/lib/supabaseClient';
 //   - Subscribe via `supabase.channel()` to postgres_changes on the `tasks`,
 //     `task_completions`, and `points_transactions` tables, event '*', schema
 //     'public', each filtered `family_id=eq.<familyId>` so the stream is scoped
-//     to this family only (R21.2). RLS (anon key + user JWT) is the backstop.
+//     to this family only (R21.2). RLS (publishable key + user JWT) is the backstop.
 //   - On any event, invalidate the matching query keys (R21.1):
 //       tasks               -> ['tasks']
 //       task_completions    -> ['tasks'] + ['points']  (a completion changes

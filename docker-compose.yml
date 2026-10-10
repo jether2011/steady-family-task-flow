@@ -24,8 +24,8 @@ services:
       PORT: 8080
       NODE_ENV: production
       SUPABASE_URL: ${SUPABASE_URL}
-      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
-      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY}
+      SUPABASE_SECRET_KEY: ${SUPABASE_SECRET_KEY}
       CORS_ORIGIN: ${CORS_ORIGIN}
     ports:
       - "8080:8080"
@@ -46,11 +46,11 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       # VITE_* are build-time (R29.7); interpolated from env, baked into bundle.
-      # Only public values — the service-role key is never passed here (R29.4).
+      # Only public values — the secret key is never passed here (R29.4).
       args:
         VITE_API_URL: ${VITE_API_URL}
         VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
-        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
+        VITE_SUPABASE_PUBLISHABLE_KEY: ${VITE_SUPABASE_PUBLISHABLE_KEY}
     ports:
       - "5173:8080"
     depends_on:
