@@ -6,6 +6,11 @@ A Node.js + TypeScript REST API built on Fastify 5, backed by a hosted Supabase 
 - Interactive API docs (OpenAPI): `/api/docs`
 - Liveness: `/api/v1/health` - Readiness: `/api/v1/ready`
 
+> Bootstrap: the responsible-user and family rows are created ONLY by the first
+> `GET /api/v1/me` after login. No other route creates them, so a client must
+> call `/me` once before any `/family` read/write — otherwise those return
+> `404 NOT_FOUND`. (The frontend's AuthContext does this automatically on login.)
+
 ## Tech stack
 
 - Node 20, ESM, strict TypeScript (NodeNext)
@@ -70,7 +75,7 @@ The schema lives in `src/supabase/migrations/` as plain SQL, applied in numeric 
 | --- | --- |
 | `001_initial_schema.sql` | Tables, enums (as TEXT + CHECK), FKs, uniqueness constraints |
 | `002_indexes.sql` | Family-scoped indexes + recurring-generation idempotency index |
-| `003_rls.sql` | Row-level security policies (ledger writes are service-role only) |
+| `003_rls.sql` | Row-level security policies (ledger writes are secret-key only) |
 | `004_functions.sql` | Atomic `complete_task` / `reopen_task` / `redeem_award` + `updated_at` trigger |
 | `005_realtime.sql` | Adds tables to the `supabase_realtime` publication |
 | `006_update_family.sql` | Atomic family/responsible-user update function |
@@ -88,6 +93,50 @@ psql "$DATABASE_URL" -f src/supabase/seed.sql    # optional demo data
 ```
 
 Migrations and `seed.sql` are idempotent, so re-running them is safe.
+
+## API routes
+
+All routes are under `/api/v1` and (except the ops probes) require a
+`Authorization: Bearer <supabase-jwt>` header. Identity and `family_id` are
+always derived from the verified session — never from the request body.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET | `/me` | Bootstrap + fetch the profile and family (creates them on first call) |
+| GET | `/family` | Fetch the composed family DTO |
+| PATCH | `/family` | Update family name / avatar / responsible name / relationship (onboarding) |
+| GET | `/family/members` | List members (`?active=true` to filter) |
+| POST | `/family/members` | Create a member |
+| PATCH | `/family/members/:id` | Update a member (incl. toggling `active`) |
+| DELETE | `/family/members/:id` | Soft-delete a member (sets `active=false`) |
+| GET | `/family/tasks` | List tasks (filters: `date`, `weekStart`, `status`, `memberId`, `priority`) |
+| POST | `/family/tasks` | Create a task |
+| PATCH | `/tasks/:id` | Update a task |
+| DELETE | `/tasks/:id` | Delete a task |
+| POST | `/tasks/:id/move` | Move a task between non-DONE board columns |
+| POST | `/tasks/:id/complete` | Complete a task and award its points (atomic) |
+| POST | `/tasks/:id/reopen` | Reopen a completed task and reverse its points (atomic) |
+| POST | `/family/tasks/carry-over` | Carry unfinished tasks into a target period |
+| GET | `/family/task-templates` | List recurring templates |
+| POST | `/family/task-templates` | Create a template |
+| PATCH | `/task-templates/:id` | Update a template |
+| DELETE | `/task-templates/:id` | Deactivate a template |
+| POST | `/family/task-templates/generate` | Generate tasks for a week from active templates |
+| GET | `/family/points` | List points-ledger entries (filters: `memberId`, `from`, `to`) |
+| GET | `/family/leaderboard` | Leaderboard for a `period` (today/week/month/all) |
+| GET | `/family/members/:id/completions` | A member's completions + ledger |
+| GET | `/family/awards` | List awards |
+| POST | `/family/awards` | Create an award |
+| PATCH | `/awards/:id` | Update an award |
+| DELETE | `/awards/:id` | Deactivate an award |
+| POST | `/awards/:id/redeem` | Redeem an award against a member's balance (atomic) |
+| GET | `/family/dashboard` | Dashboard aggregate (family, active members, today's tasks, totals) |
+| GET | `/family/board` | Weekly board aggregate for a `weekStart` |
+| GET | `/health`, `/ready` | Liveness / readiness probes (no auth) |
+
+Create bodies are validated with strict Zod schemas: unknown keys (e.g. a
+client-supplied `family_id`, `active`, or a task's initial `status`) are
+rejected as `422 VALIDATION`, since those are server-derived.
 
 ## Testing
 
@@ -179,3 +228,4 @@ Vercel targets serverless/static workloads and does not keep a long-lived Fastif
 - 401 on every request: the frontend is sending no/expired token, or the Supabase project URL does not match the one that issued the JWT.
 - CORS errors in the browser: CORS_ORIGIN must list the frontend's exact origin (scheme + host + port, no trailing slash).
 - /api/v1/ready returns 503: the backend cannot reach Supabase - check SUPABASE_URL and network egress.
+- `GET`/`PATCH /family` returns 404 right after login: `GET /me` has not run yet, so the family row doesn't exist. Call `/me` first (the frontend does this automatically).

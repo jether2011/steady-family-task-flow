@@ -6,11 +6,22 @@ A React 18 single-page app (Vite + Tailwind + TanStack Query) for the Family Tas
 
 ## Tech stack
 
-- React 18, Vite, Tailwind CSS, Radix UI
+- React 18, Vite, Tailwind CSS v3 (pinned; v4 moved its PostCSS plugin), Radix UI
 - TanStack Query for data fetching/caching
 - `@supabase/supabase-js` for auth + realtime
 - Typed REST client in `src/api/` (`.ts`)
 - Vitest + React Testing Library for tests
+
+## User flow
+
+1. The app is gated by `ProtectedRoute`: while the Supabase session resolves it shows a loader, and with no session it renders the single "Continue with Google" login screen.
+2. On login, `AuthContext` calls `GET /api/v1/me` once to bootstrap the backend family rows BEFORE any page reads `/family`. Without this the family wouldn't exist and `/family` would 404.
+3. `Layout` sends the user to `/onboarding` until the family is configured (helper `isFamilyConfigured` in `src/lib/familyUtils.js`: both `relationship` and `responsible_name` set). Onboarding submits name + your name + role via `PATCH /family`, then routes to the dashboard. There is no "load sample data" option — the flow is fully manual.
+4. From there: Members (CRUD), Board/Dashboard (create, assign, move, complete tasks), Leaderboard, Awards (create + redeem), Templates, History, and Wall Mode.
+
+### Create-payload convention
+
+The backend's create schemas are strict: they reject any field that is server-derived. So the modals send ONLY user-authored fields — never `family_id`, `owner_id`, `created_by_user_id`, `active`, or a task's initial `status`, and optional id/date fields are sent as `null` (not `""`). This is what keeps member/task/template/award creation from failing with `422 VALIDATION`.
 
 ## Prerequisites
 
@@ -59,7 +70,7 @@ All frontend variables are build-time (Vite `import.meta.env.VITE_*`) and are ba
 npm test
 ```
 
-Runs the component and hook suites (client/auth/hooks/realtime/Wall Mode/parity). No backend or network is needed - the api modules and Supabase client are mocked.
+Runs the component and hook suites (REST client, auth + `/me` bootstrap, hooks, realtime, Wall Mode, onboarding, parity). No backend or network is needed - the api modules and Supabase client are mocked.
 
 ## Build and run with Docker
 
@@ -146,3 +157,5 @@ From the repo root, `docker compose up -d --build` builds and runs the backend a
 - API calls fail with CORS errors: the backend's `CORS_ORIGIN` must include this app's exact origin.
 - Calls hit the wrong host, or 404s after refresh: `VITE_API_URL` was wrong at build time (rebuild to change it), or the static host is not falling back to `index.html` for SPA routes.
 - Env change had no effect: `VITE_*` are compile-time - rebuild/redeploy after changing them.
+- `/family` returns 404 right after login: the `/me` bootstrap didn't run. In the Network tab you should see `GET /api/v1/me` fire right after login, before any `/family` call; if it's missing, hard-reload so the latest `AuthContext` is loaded.
+- Create fails with `422 VALIDATION`: the request includes a server-derived field (`family_id`, `owner_id`, `active`, a task's `status`) or an empty string where a uuid/date is expected. Send only user-authored fields; use `null` for empty optionals.

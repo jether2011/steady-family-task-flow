@@ -20,7 +20,7 @@ Both talk to a hosted Supabase project, which provides the PostgreSQL database, 
 Browser ->|   frontend   | ------------------> |   backend    |
           | (React SPA)  |   REST /api/v1      |  (Fastify)   |
           +------+-------+                     +------+-------+
-                 | Google OAuth + realtime            | service-role
+                 | Google OAuth + realtime            | secret key
                  | (publishable key)                  | (privileged)
                  v                                    v
           +---------------------------------------------------+
@@ -31,6 +31,24 @@ Browser ->|   frontend   | ------------------> |   backend    |
 
 - The frontend signs users in with Supabase Google OAuth and sends the resulting JWT as a Bearer token to the backend. It subscribes to Supabase Realtime for live board updates.
 - The backend verifies the JWT against Supabase's JWKS, resolves the caller's family, and performs all privileged writes (the points ledger uses atomic PostgreSQL functions) using the Supabase secret key. Row-level security is a second isolation guarantee for reads.
+
+---
+
+## User flow
+
+The app models ONE responsible adult per family; everyone else is a member record (no login) that the responsible manages.
+
+1. Sign in with Google (the only auth method).
+2. On the first authenticated load, the frontend calls `GET /api/v1/me`, which bootstraps the backing rows: it creates the responsible user and a default family if they don't exist yet. Nothing else creates them, so this call must happen before any family read/write.
+3. Onboarding. A freshly-created family is "unconfigured" (its `relationship` and `responsible_name` are still empty). The app routes the user to `/onboarding` until they submit the family name, their display name, and their role (`PATCH /api/v1/family`). After that the family counts as configured and the app opens.
+4. Add members (name, type, color, optional birth year).
+5. Create tasks and assign each to a member; move them across the board columns (Backlog -> To Do -> Working).
+6. Complete a task to award its points to the assigned member (atomic ledger write). Reopen reverses the award. The leaderboard and dashboard totals are derived from the ledger.
+7. Create awards and redeem them against a member's balance.
+
+Notes:
+- The responsible user who logs in manages everything (points, awards, members, tasks). There is no per-role gate beyond family ownership.
+- On create, the client sends only user-authored fields; identity and server-owned fields (`family_id`, `created_by_user_id`, `active`, a task's initial `status`) are derived by the backend and must not be sent.
 
 ---
 
