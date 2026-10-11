@@ -84,7 +84,8 @@ export interface TaskRow {
   title: string;
   description: string | null;
   assigned_member_id: string | null;
-  created_by_user_id: string;
+  created_by_user_id: string | null;
+  created_by_app_user_id?: string;
   status: TaskStatus;
   priority: Priority;
   points: number;
@@ -101,7 +102,8 @@ export interface TaskCompletionRow {
   id: string;
   task_id: string;
   family_id: string;
-  completed_by_user_id: string;
+  completed_by_user_id: string | null;
+  completed_by_app_user_id?: string;
   completed_by_member_id: string;
   completed_at: string;
 }

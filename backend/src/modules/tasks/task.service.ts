@@ -32,10 +32,7 @@ import {
   moveTask,
   updateTask,
 } from './task.repository.js';
-import type {
-  CarriedTaskInsert,
-  CarryOverTarget,
-} from './task.repository.js';
+import type { CarriedTaskInsert, CarryOverTarget } from './task.repository.js';
 import type {
   CarryOverInput,
   TaskCreateInput,
@@ -60,6 +57,9 @@ function toTaskDTO(row: TaskRow): TaskDTO {
     description: row.description,
     assigned_member_id: row.assigned_member_id,
     created_by_user_id: row.created_by_user_id,
+    ...(row.created_by_app_user_id
+      ? { created_by_app_user_id: row.created_by_app_user_id }
+      : {}),
     status: row.status,
     priority: row.priority,
     points: row.points,
@@ -88,7 +88,9 @@ async function assertAssigneeInFamily(
   }
   const ok = await memberBelongsToFamily(familyId, memberId);
   if (!ok) {
-    throw new ValidationError('assigned_member_id does not belong to this family');
+    throw new ValidationError(
+      'assigned_member_id does not belong to this family',
+    );
   }
 }
 
@@ -257,10 +259,15 @@ export async function carryOver(
   }
 
   const originIds = candidates.map((c) => c.id);
-  const alreadyCarried = await findAlreadyCarried(ctx.familyId, target, originIds);
+  const alreadyCarried = await findAlreadyCarried(
+    ctx.familyId,
+    target,
+    originIds,
+  );
 
   const targetDueDate = target.kind === 'date' ? target.targetDate : null;
-  const targetWeekStart = target.kind === 'week' ? target.targetWeekStart : null;
+  const targetWeekStart =
+    target.kind === 'week' ? target.targetWeekStart : null;
 
   const toInsert: CarriedTaskInsert[] = candidates
     .filter((origin) => !alreadyCarried.has(origin.id))

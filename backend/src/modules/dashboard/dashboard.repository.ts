@@ -39,7 +39,7 @@ export type { FamilyAndResponsible };
 /** Columns selected for a task row (mirrors the tasks module selection). */
 const TASK_COLUMNS =
   'id, family_id, template_id, title, description, assigned_member_id, ' +
-  'created_by_user_id, status, priority, points, due_date, due_time, ' +
+  'created_by_app_user_id, created_by_user_id, status, priority, points, due_date, due_time, ' +
   'week_start, carried_from_task_id, created_at, updated_at';
 
 /** Columns selected for a points-ledger row. */

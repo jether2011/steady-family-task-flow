@@ -39,7 +39,7 @@ Browser ->|   frontend   | ------------------> |   backend    |
 The app models ONE responsible adult per family; everyone else is a member record (no login) that the responsible manages.
 
 1. Sign in with Google (the only auth method).
-2. On the first authenticated load, the frontend calls `GET /api/v1/me`, which bootstraps the backing rows: it creates the responsible user and a default family if they don't exist yet. Nothing else creates them, so this call must happen before any family read/write.
+2. On the first authenticated load, the frontend calls `GET /api/v1/me`, which resolves the verified account to an existing family membership and its OWNER, MANAGER, or MEMBER role. It never creates a family. Unknown accounts see NO_ACCESS; tenant creation is planned in specification 04.
 3. Onboarding. A freshly-created family is "unconfigured" (its `relationship` and `responsible_name` are still empty). The app routes the user to `/onboarding` until they submit the family name, their display name, and their role (`PATCH /api/v1/family`). After that the family counts as configured and the app opens.
 4. Add members (name, type, color, optional birth year).
 5. Create tasks and assign each to a member; move them across the board columns (Backlog -> To Do -> Working).
@@ -70,7 +70,7 @@ Everything the apps need in code is in this repo, but a Supabase project must be
    - publishable key (`sb_publishable_...`) -> `SUPABASE_PUBLISHABLE_KEY` / `VITE_SUPABASE_PUBLISHABLE_KEY` (safe to expose to the browser; replaces the legacy anon key)
    - secret key (`sb_secret_...`) -> `SUPABASE_SECRET_KEY` (secret - backend only, never ship to the browser or commit it; replaces the legacy service_role key)
 3. Enable Google OAuth. Go to Authentication -> Providers -> Google, toggle it on, and paste a Google OAuth Client ID and Client Secret (created in the [Google Cloud Console](https://console.cloud.google.com/) under APIs & Services -> Credentials -> OAuth client ID -> Web application). In the Google credential, add Supabase's callback URL (`https://<your-project-ref>.supabase.co/auth/v1/callback`) as an authorized redirect URI. In Authentication -> URL Configuration, set the Site URL to your frontend origin (e.g. `http://localhost:5173` for local dev).
-4. Apply the database schema. Run the SQL migrations and seed in order. The simplest path is the dashboard SQL Editor: open each file under `backend/src/supabase/migrations/` in numeric order (001 -> 006) and run it, then optionally run `backend/src/supabase/seed.sql` for demo data. The backend README also shows how to apply them with psql or the Supabase CLI.
+4. Apply the database schema. Run the SQL migrations and seed in order. The simplest path is the dashboard SQL Editor: open each file under `backend/src/supabase/migrations/` in numeric order (001 -> 007) and run it, then optionally run `backend/src/supabase/seed.sql` for demo data. The backend README also shows how to apply them with psql or the Supabase CLI.
 
 > Why this is manual: creating the project, flipping the Google provider on, and supplying Google's OAuth credentials are account/console/third-party actions. The migrations, API, and auth wiring are all already in code.
 
@@ -163,7 +163,7 @@ Deploy order that avoids a chicken-and-egg problem:
 |  |  +- modules/        # auth, family, members, tasks, completions, templates, gamification, dashboard, ops
 |  |  +- middleware/     # auth, context, authorization, error handling
 |  |  +- config/         # env, supabase clients, logger, docs
-|  |  +- supabase/       # SQL migrations 001-006 + seed.sql
+|  |  +- supabase/       # SQL migrations 001-007 + seed.sql
 |  +- Dockerfile
 +- frontend/             # React SPA (data-layer migrated off Base44 to a typed REST client)
 |  +- src/
@@ -182,3 +182,5 @@ Deploy order that avoids a chicken-and-egg problem:
 ## License
 
 See LICENSE.
+
+Membership access setup and rollout: [implementation guide](docs/implementation/01-membership-rollout.md).

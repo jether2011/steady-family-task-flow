@@ -3,7 +3,7 @@ import React from 'react';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { QueryClientProvider, QueryClient } from '@tanstack/react-query';
 
@@ -51,6 +51,23 @@ vi.mock('@/lib/supabaseClient', () => {
   return { supabase, default: supabase };
 });
 
+vi.mock('@/api/family.api', () => ({
+  family: {
+    me: vi.fn(async () => ({
+      state: 'READY',
+      family: { id: 'fam-1' },
+      user: { id: 'app' },
+      membership: {
+        id: 'membership',
+        role: 'OWNER',
+        memberId: null,
+        accessVersion: 1,
+      },
+      capabilities: ['family:manage'],
+    })),
+  },
+}));
+
 vi.mock('@/api/client', () => ({
   configureApiClient: vi.fn(),
 }));
@@ -77,7 +94,11 @@ const mockData = vi.hoisted(() => ({
 }));
 
 vi.mock('@/hooks/useFamily', () => {
-  const mutation = () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false });
+  const mutation = () => ({
+    mutate: vi.fn(),
+    mutateAsync: vi.fn(),
+    isPending: false,
+  });
   return {
     useFamily: () => ({ data: mockData.family }),
     useMembers: () => ({ data: mockData.members }),
@@ -170,7 +191,9 @@ function renderGatedWall() {
       <QueryClientProvider client={new QueryClient()}>
         <MemoryRouter initialEntries={['/wall']}>
           <Routes>
-            <Route element={<ProtectedRoute unauthenticatedElement={<Login />} />}>
+            <Route
+              element={<ProtectedRoute unauthenticatedElement={<Login />} />}
+            >
               <Route path="/wall" element={<Wall />} />
             </Route>
           </Routes>
@@ -303,8 +326,12 @@ describe('Wall Mode reduced-motion handling (R19.3)', () => {
     // Reduced motion must not degrade functionality: the board still renders
     // its members and tasks. The motion suppression itself is OS/CSS driven and
     // not a JS branch Wall takes.
-    expect(window.matchMedia('(prefers-reduced-motion: reduce)').matches).toBe(true);
-    expect(screen.getByRole('heading', { name: 'Ada Lovelace' })).toBeInTheDocument();
+    expect(window.matchMedia('(prefers-reduced-motion: reduce)').matches).toBe(
+      true,
+    );
+    expect(
+      screen.getByRole('heading', { name: 'Ada Lovelace' }),
+    ).toBeInTheDocument();
     expect(screen.getByText('Wash the dishes')).toBeInTheDocument();
   });
 });
@@ -326,7 +353,9 @@ describe('Wall Mode touch targets and focus visibility (R19.2 / R31.1 / R31.3)',
     renderAuthedWall();
 
     // Ada's TODO task offers a "Mark done" control.
-    const complete = screen.getByRole('button', { name: /mark wash the dishes done/i });
+    const complete = screen.getByRole('button', {
+      name: /mark wash the dishes done/i,
+    });
     expect(complete).toHaveClass('min-h-11');
     expect(complete).toHaveClass('min-w-11');
     expect(complete.className).toMatch(/focus-visible:ring-2/);
@@ -336,7 +365,9 @@ describe('Wall Mode touch targets and focus visibility (R19.2 / R31.1 / R31.3)',
     renderAuthedWall();
 
     // Alan's DONE task offers a "Reopen" control.
-    const reopen = screen.getByRole('button', { name: /reopen take out the trash/i });
+    const reopen = screen.getByRole('button', {
+      name: /reopen take out the trash/i,
+    });
     expect(reopen).toHaveClass('min-h-11');
     expect(reopen).toHaveClass('min-w-11');
     expect(reopen.className).toMatch(/focus-visible:ring-2/);

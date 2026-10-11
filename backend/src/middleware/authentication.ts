@@ -86,7 +86,9 @@ function getJwks(): ReturnType<typeof createRemoteJWKSet> {
  * Returns the trimmed token, or `undefined` when the header is absent or does
  * not match the Bearer scheme.
  */
-export function extractBearerToken(authorization: string | undefined): string | undefined {
+export function extractBearerToken(
+  authorization: string | undefined,
+): string | undefined {
   if (typeof authorization !== 'string') {
     return undefined;
   }
@@ -113,6 +115,8 @@ export type JwtVerifier = (token: string) => Promise<JWTPayload>;
 async function defaultVerify(token: string): Promise<JWTPayload> {
   const { payload } = await jwtVerify(token, getJwks(), {
     issuer: ISSUER,
+    audience: 'authenticated',
+    requiredClaims: ['sub', 'exp'],
   });
   return payload;
 }
@@ -135,7 +139,9 @@ export function setJwtVerifier(next?: JwtVerifier): void {
  * token lacking a usable `sub` claim. The returned value is the ONLY identity
  * the rest of the pipeline may trust (R1.7, R23.2).
  */
-export async function authenticateRequest(request: FastifyRequest): Promise<string> {
+export async function authenticateRequest(
+  request: FastifyRequest,
+): Promise<string> {
   const token = extractBearerToken(request.headers.authorization);
   if (token === undefined) {
     throw new Unauthorized();
@@ -240,7 +246,9 @@ export async function authenticateRequestWithClaims(
  * `request.authClaims`. Register this on the `/api/v1` scope (skipping public
  * probes) so it runs before context resolution and route handlers.
  */
-export async function authenticationHook(request: FastifyRequest): Promise<void> {
+export async function authenticationHook(
+  request: FastifyRequest,
+): Promise<void> {
   const { authUserId, claims } = await authenticateRequestWithClaims(request);
   request.authUserId = authUserId;
   request.authClaims = claims;

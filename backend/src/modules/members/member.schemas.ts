@@ -1,3 +1,4 @@
+import { AccessProvision } from '../access/access.schemas.js';
 /**
  * Members module Zod schemas — request/response contracts for `/family/members`.
  *
@@ -24,6 +25,7 @@ import { MEMBER_TYPE_VALUES } from '../../shared/constants/index.js';
  */
 export const MemberCreate = z
   .object({
+    access: AccessProvision.optional(),
     name: z.string().min(1),
     member_type: z.enum(MEMBER_TYPE_VALUES),
     avatar_url: z.string().nullable().optional(),
@@ -110,5 +112,15 @@ export const MembersResponse = z.object({
  * `active=false`).
  */
 export const MemberResponse = z.object({
+  access: z
+    .object({
+      membershipId: z.uuid(),
+      email: z.string().nullable(),
+      role: z.enum(['OWNER', 'MANAGER', 'MEMBER']),
+      status: z.enum(['PROVISIONED', 'ACTIVE', 'REVOKED']),
+      accessVersion: z.number().int(),
+    })
+    .nullable()
+    .optional(),
   member: MemberDTOSchema,
 });

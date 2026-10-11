@@ -21,6 +21,10 @@ services:
     # Config comes from the environment / root .env (R29.4). The service-role
     # key is interpolated from the host — never a literal value in this file.
     environment:
+      MEMBERSHIP_ACCESS_ENABLED: ${MEMBERSHIP_ACCESS_ENABLED:-false}
+      ACCESS_EMAIL_DELIVERY_URL: ${ACCESS_EMAIL_DELIVERY_URL:-}
+      ACCESS_EMAIL_DELIVERY_TOKEN: ${ACCESS_EMAIL_DELIVERY_TOKEN:-}
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-}
       PORT: 8080
       NODE_ENV: production
       SUPABASE_URL: ${SUPABASE_URL}

@@ -20,10 +20,7 @@ export type TaskStatus = 'BACKLOG' | 'TODO' | 'WORKING' | 'DONE';
 export type Priority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
 export type RecurrenceType = 'DAILY' | 'WEEKDAYS' | 'WEEKLY' | 'CUSTOM';
 export type TransactionType =
-  | 'TASK_COMPLETION'
-  | 'MANUAL_ADJUSTMENT'
-  | 'REVERSAL'
-  | 'REDEMPTION';
+  'TASK_COMPLETION' | 'MANUAL_ADJUSTMENT' | 'REVERSAL' | 'REDEMPTION';
 
 /** Leaderboard period query values. */
 export type LeaderboardPeriod = 'today' | 'week' | 'month' | 'all';
@@ -59,12 +56,35 @@ export interface ResponsibleUser {
 }
 
 /** `GET /me` payload: profile + family (family created on first login). */
-export interface MePayload {
-  family: Family;
-  responsibleUser: ResponsibleUser;
+export interface AccessSummary {
+  membershipId: string;
+  email: string | null;
+  role: 'OWNER' | 'MANAGER' | 'MEMBER';
+  status: 'PROVISIONED' | 'ACTIVE' | 'REVOKED';
+  accessVersion: number;
 }
+export type MePayload = {
+  user: { id: string; displayName: string | null; avatarUrl: string | null };
+  capabilities: string[];
+} & (
+  | {
+      state: 'NO_ACCESS' | 'REVOKED';
+      family: null;
+      membership: null;
+    }
+  | {
+      state: 'READY' | 'ONBOARDING_REQUIRED' | 'PAYMENT_REQUIRED';
+      family: Family;
+      membership: {
+        id: string;
+        role: 'OWNER' | 'MANAGER' | 'MEMBER';
+        memberId: string | null;
+        accessVersion: number;
+      };
+    }
+);
 
-/** A household participant. Members have no login (database records only). */
+/** A household participant. Login access is optional and separate from participant type. */
 export interface Member {
   id: string;
   family_id: string;
@@ -86,7 +106,8 @@ export interface Task {
   title: string;
   description: string | null;
   assigned_member_id: string | null;
-  created_by_user_id: string;
+  created_by_user_id: string | null;
+  created_by_app_user_id?: string;
   status: TaskStatus;
   priority: Priority;
   points: number;
@@ -223,6 +244,7 @@ export interface FamilyUpdate {
 }
 
 export interface MemberCreate {
+  access?: { enabled: true; email: string; role: 'MEMBER' | 'MANAGER' };
   name: string;
   member_type: MemberType;
   avatar_url?: string | null;

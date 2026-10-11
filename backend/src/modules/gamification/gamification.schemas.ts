@@ -84,7 +84,9 @@ export const MemberCompletionsParams = z
   .strict();
 
 /** Parsed, validated member-completions `:id` path params. */
-export type MemberCompletionsParamsInput = z.infer<typeof MemberCompletionsParams>;
+export type MemberCompletionsParamsInput = z.infer<
+  typeof MemberCompletionsParams
+>;
 
 /* ------------------------------------------------------------------------- *
  * Response schemas                                                           *
@@ -106,7 +108,8 @@ export const TaskCompletionDTOSchema = z.object({
   id: z.string().uuid(),
   task_id: z.string().uuid(),
   family_id: z.string().uuid(),
-  completed_by_user_id: z.string().uuid(),
+  completed_by_user_id: z.string().uuid().nullable().optional(),
+  completed_by_app_user_id: z.string().uuid().optional(),
   completed_by_member_id: z.string().uuid(),
   completed_at: z.string(),
 });

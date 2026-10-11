@@ -1,3 +1,5 @@
+import { readMemberAccess } from '../access/access.service.js';
+import { accessSummary } from '../access/access.types.js';
 /**
  * Member controller — HTTP glue for the `/api/v1/family/members` routes.
  *
@@ -13,12 +15,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 
 import { requireFamilyContext } from '../../middleware/context.js';
 import type { MemberDTO } from '../../shared/types/index.js';
-import {
-  create,
-  deactivate,
-  list,
-  update,
-} from './member.service.js';
+import { create, deactivate, list, update } from './member.service.js';
 import type {
   MemberCreateInput,
   MemberIdParamsInput,
@@ -32,7 +29,10 @@ export async function listMembersHandler(
   _reply: FastifyReply,
 ): Promise<{ members: MemberDTO[] }> {
   const { familyId } = requireFamilyContext(request);
-  const members = await list({ familyId }, { activeOnly: request.query.active === true });
+  const members = await list(
+    { familyId },
+    { activeOnly: request.query.active === true },
+  );
   return { members };
 }
 
@@ -40,16 +40,24 @@ export async function listMembersHandler(
 export async function createMemberHandler(
   request: FastifyRequest<{ Body: MemberCreateInput }>,
   reply: FastifyReply,
-): Promise<{ member: MemberDTO }> {
+): Promise<{ member: MemberDTO; access?: ReturnType<typeof accessSummary> }> {
   const { familyId } = requireFamilyContext(request);
   const member = await create({ familyId }, request.body);
   void reply.code(201);
-  return { member };
+  return {
+    member,
+    ...(request.body.access
+      ? { access: accessSummary(await readMemberAccess(member.id)) }
+      : {}),
+  };
 }
 
 /** `PATCH /api/v1/family/members/:id` → `{ member }` (R3.3; foreign id → 404, R3.6). */
 export async function updateMemberHandler(
-  request: FastifyRequest<{ Params: MemberIdParamsInput; Body: MemberUpdateInput }>,
+  request: FastifyRequest<{
+    Params: MemberIdParamsInput;
+    Body: MemberUpdateInput;
+  }>,
   _reply: FastifyReply,
 ): Promise<{ member: MemberDTO }> {
   const { familyId } = requireFamilyContext(request);

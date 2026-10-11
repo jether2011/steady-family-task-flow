@@ -1,250 +1,200 @@
-import React, { createContext, useState, useContext, useEffect, useCallback, useRef } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  useCallback,
+} from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { configureApiClient } from '@/api/client';
 import { family as familyApi } from '@/api/family.api';
-
-// AuthContext — reworked for Supabase Google OAuth (DP-3 / R1.8 / R24.5 / R24.6).
-//
-// This replaces the previous Base44-based auth. Data access now goes through
-// the typed REST client (`@/api/client`), which we wire up here via
-// `configureApiClient` so it can:
-//   - attach the current Supabase access token as a Bearer header, and
-//   - redirect to the Google OAuth login flow on a 401 (R24.5).
-//
-// The public surface is kept backward compatible so existing pages/components
-// (App.jsx, Layout, Settings, modals, ProtectedRoute, Onboarding) keep working
-// during the migration. Legacy Base44-only fields are retained as inert
-// defaults and will be cleaned up by the auth-page removal task (16.2):
-//   - isLoadingPublicSettings: always false (no Base44 app-settings fetch).
-//   - appPublicSettings:       always null.
-//   - checkAppState:           alias of the Supabase session check.
-//
-// Added for the Supabase rework:
-//   - login() / redirectToLogin(): start Google OAuth.
-//   - getAccessToken():            current session access token (or null).
-
+import { queryClientInstance } from '@/lib/query-client';
 const AuthContext = createContext(null);
-
-// Where Google sends the user back after consenting. supabase-js
-// (detectSessionInUrl) parses the session from this URL and fires
-// onAuthStateChange. The SPA root handles the rest.
-const OAUTH_REDIRECT_PATH = '/';
-
-function mapSessionUser(session) {
-  // Normalize the Supabase user into the shape existing components read.
-  // Components currently use `user.email`, `user.id`, and display name-ish
-  // fields; expose the raw Supabase user plus a couple of convenience fields.
-  const u = session?.user ?? null;
-  if (!u) return null;
-  return {
-    ...u,
-    // Convenience fields that mirror common Base44 user props so UI code that
-    // reads `full_name` / `email` keeps rendering.
-    email: u.email ?? u.user_metadata?.email ?? null,
-    full_name:
-      u.user_metadata?.full_name ??
-      u.user_metadata?.name ??
-      u.email ??
-      null,
-  };
-}
-
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isLoadingAuth, setIsLoadingAuth] = useState(true);
-  const [authError, setAuthError] = useState(null);
-  const [authChecked, setAuthChecked] = useState(false);
-
-  // Guard so we only wire the REST client once per provider instance.
-  const configuredRef = useRef(false);
-  // Tracks the auth user id we've already bootstrapped (GET /me) so repeated
-  // onAuthStateChange emissions (token refresh, tab focus) don't re-run it.
-  const bootstrappedUserRef = useRef(null);
-
-  const applySession = useCallback(async (session) => {
-    const mapped = mapSessionUser(session);
-    setUser(mapped);
-    setIsAuthenticated(!!session);
-
-    // CRITICAL: the backend creates the responsible_user + family rows ONLY on
-    // the first GET /me after login. Nothing else does. Until that runs, every
-    // GET/PATCH /family returns 404 (NOT_FOUND), which breaks onboarding. So we
-    // bootstrap here as soon as we have a session, and only mark auth "checked"
-    // (which releases ProtectedRoute to render the app) once it has completed —
-    // this guarantees the family exists before any page fires GET /family.
-    if (session?.user) {
-      if (bootstrappedUserRef.current !== session.user.id) {
-        try {
-          await familyApi.me();
-          bootstrappedUserRef.current = session.user.id;
-        } catch (error) {
-          // Don't hard-block the UI on a transient bootstrap failure; log it and
-          // let the app proceed (the onboarding/family calls will surface a
-          // meaningful error if the backend is truly unreachable).
-          console.error('[AuthContext] /me bootstrap failed:', error);
-        }
+  const [access, setAccess] = useState(null);
+  const [isLoadingAuth, setLoading] = useState(true);
+  const [authError, setError] = useState(null);
+  const generation = useRef(0),
+    scope = useRef(null),
+    mounted = useRef(true),
+    sessionUser = useRef(null);
+  const clearScope = useCallback(async () => {
+    await queryClientInstance.cancelQueries();
+    queryClientInstance.clear();
+    scope.current = null;
+  }, []);
+  const resolve = useCallback(
+    async (session, { background = false } = {}) => {
+      if (!mounted.current) return;
+      const turn = ++generation.current;
+      if (!background) {
+        setLoading(true);
+        setAccess(null);
       }
-    } else {
-      bootstrappedUserRef.current = null;
-    }
-
-    setIsLoadingAuth(false);
-    setAuthChecked(true);
-  }, []);
-
-  // Return the current access token (or null). Used by the REST client to
-  // attach the Bearer header on every request.
+      if (sessionUser.current !== session?.user?.id) {
+        setAccess(null);
+        await clearScope();
+      }
+      if (!mounted.current || turn !== generation.current) return;
+      sessionUser.current = session?.user?.id ?? null;
+      setUser(
+        session?.user
+          ? {
+              ...session.user,
+              full_name: session.user.user_metadata?.name ?? session.user.email,
+            }
+          : null,
+      );
+      if (!session?.user) {
+        setAccess(null);
+        setError(null);
+        setLoading(false);
+        return;
+      }
+      try {
+        const next = await familyApi.me();
+        if (!mounted.current || turn !== generation.current) return;
+        const key = JSON.stringify([
+          session.user.id,
+          next.family?.id,
+          next.membership?.role,
+          next.membership?.accessVersion,
+          next.state,
+        ]);
+        if (scope.current !== key) {
+          setAccess(null);
+          await clearScope();
+          if (turn !== generation.current) return;
+          scope.current = key;
+        }
+        setAccess(next);
+        setError(null);
+      } catch (error) {
+        if (turn === generation.current) {
+          setAccess(null);
+          await clearScope();
+          if (turn === generation.current)
+            setError({
+              message: error.message || 'Could not resolve family access',
+            });
+        }
+      } finally {
+        if (mounted.current && turn === generation.current) setLoading(false);
+      }
+    },
+    [clearScope],
+  );
+  const retryAccessResolution = useCallback(async () => {
+    const { data } = await supabase.auth.getSession();
+    await resolve(data.session);
+  }, [resolve]);
   const getAccessToken = useCallback(async () => {
-    try {
-      const { data } = await supabase.auth.getSession();
-      return data.session?.access_token ?? null;
-    } catch (error) {
-      console.error('[AuthContext] getAccessToken failed:', error);
-      return null;
-    }
+    const { data } = await supabase.auth.getSession();
+    return data.session?.access_token ?? null;
   }, []);
-
-  // Start the Google OAuth sign-in flow. Named `redirectToLogin` to match the
-  // REST client's 401 handler; `login` is an alias for call sites that read
-  // more naturally.
-  const redirectToLogin = useCallback(async () => {
-    setAuthError(null);
+  const redirectToLogin = useCallback(() => {
+    generation.current++;
+    sessionUser.current = null;
+    setUser(null);
+    setAccess(null);
+    setLoading(false);
+    void clearScope();
+  }, [clearScope]);
+  const login = useCallback(async () => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: window.location.origin + OAUTH_REDIRECT_PATH,
+        redirectTo:
+          window.location.origin +
+          (window.location.pathname === '/access-email-confirm'
+            ? window.location.pathname + window.location.search
+            : '/'),
       },
     });
-    if (error) {
-      console.error('[AuthContext] signInWithOAuth failed:', error);
-      setAuthError({ type: 'auth_required', message: error.message });
-    }
+    if (error)
+      setError({ message: 'Sign-in could not be started. Please try again.' });
   }, []);
-
-  const login = redirectToLogin;
-
-  // Sign out and clear local auth state. `shouldRedirect` kept for signature
-  // compatibility with the previous Base44 logout; after sign-out we send the
-  // user back to the OAuth login flow when asked.
-  const logout = useCallback(
-    async (shouldRedirect = true) => {
-      try {
-        await supabase.auth.signOut();
-      } catch (error) {
-        console.error('[AuthContext] signOut failed:', error);
-      }
-      setUser(null);
-      setIsAuthenticated(false);
-      setAuthChecked(true);
-      setIsLoadingAuth(false);
-      if (shouldRedirect) {
-        redirectToLogin();
-      }
-    },
-    [redirectToLogin],
-  );
-
-  // Re-check the current session on demand. Kept as `checkUserAuth` (and
-  // aliased as `checkAppState`) so existing callers (ProtectedRoute, App) still
-  // work without changes.
-  const checkUserAuth = useCallback(async () => {
-    setIsLoadingAuth(true);
+  const logout = useCallback(async () => {
+    redirectToLogin();
     try {
-      const { data, error } = await supabase.auth.getSession();
-      if (error) throw error;
-      applySession(data.session);
-    } catch (error) {
-      console.error('[AuthContext] session check failed:', error);
-      setUser(null);
-      setIsAuthenticated(false);
-      setIsLoadingAuth(false);
-      setAuthChecked(true);
+      await supabase.auth.signOut();
+    } catch {
+      setError({ message: 'Remote sign-out failed. Please try again.' });
     }
-  }, [applySession]);
-
-  const checkAppState = checkUserAuth;
-
-  // Wire the REST client to this context's token provider + 401 handler, once.
-  // Done in an effect so it runs on mount (and if the callbacks' identity is
-  // stable, not repeatedly).
+  }, [redirectToLogin]);
   useEffect(() => {
-    if (configuredRef.current) return;
-    configuredRef.current = true;
-    configureApiClient({
-      getAccessToken,
-      onUnauthorized: redirectToLogin,
-    });
-  }, [getAccessToken, redirectToLogin]);
-
-  // Restore the session on mount and subscribe to auth state changes so
-  // user/isAuthenticated stay reactive (login completion, token refresh,
-  // sign-out from another tab). Unsubscribe on unmount.
-  useEffect(() => {
-    let active = true;
-
-    supabase.auth
-      .getSession()
-      .then(({ data }) => {
-        if (!active) return;
-        applySession(data.session);
-      })
-      .catch((error) => {
-        if (!active) return;
-        console.error('[AuthContext] initial getSession failed:', error);
-        setUser(null);
-        setIsAuthenticated(false);
-        setIsLoadingAuth(false);
-        setAuthChecked(true);
-      });
-
+    mounted.current = true;
+    configureApiClient({ getAccessToken, onUnauthorized: redirectToLogin });
+    const restore = () => {
+      const started = generation.current;
+      return supabase.auth
+        .getSession()
+        .then(({ data }) => {
+          if (mounted.current && generation.current === started)
+            return resolve(data.session, { background: true });
+        })
+        .catch(() => {
+          if (!mounted.current || generation.current !== started) return;
+          generation.current++;
+          setAccess(null);
+          void clearScope();
+          setLoading(false);
+          setError({ message: 'Could not restore your session' });
+        });
+    };
+    void restore();
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!active) return;
-      applySession(session);
+      // Provider callbacks must return before performing session-dependent REST work.
+      setTimeout(() => {
+        if (mounted.current) void resolve(session);
+      }, 0);
     });
-
-    return () => {
-      active = false;
-      subscription?.unsubscribe();
+    const timer = setInterval(() => {
+      if (sessionUser.current) void restore();
+    }, 30000);
+    const focus = () => {
+      if (sessionUser.current) void restore();
     };
-  }, [applySession]);
-
+    window.addEventListener('focus', focus);
+    return () => {
+      mounted.current = false;
+      generation.current++;
+      subscription.unsubscribe();
+      clearInterval(timer);
+      window.removeEventListener('focus', focus);
+    };
+  }, [resolve, getAccessToken, redirectToLogin, clearScope]);
   return (
     <AuthContext.Provider
       value={{
-        // Core reactive auth state
         user,
-        isAuthenticated,
+        access,
+        isAuthenticated: !!user,
         isLoadingAuth,
+        authChecked: !isLoadingAuth,
         authError,
-        authChecked,
-
-        // Actions
         login,
         redirectToLogin,
         logout,
         getAccessToken,
-        checkUserAuth,
-        checkAppState,
-
-        // Legacy Base44-era fields kept inert for backward compatibility.
-        // Removed/cleaned up by the auth-page removal task (16.2).
+        retryAccessResolution,
+        checkUserAuth: retryAccessResolution,
+        checkAppState: retryAccessResolution,
+        navigateToLogin: redirectToLogin,
         isLoadingPublicSettings: false,
         appPublicSettings: null,
-        navigateToLogin: redirectToLogin,
       }}
     >
       {children}
     </AuthContext.Provider>
   );
 };
-
 export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+  const value = useContext(AuthContext);
+  if (!value) throw new Error('useAuth must be used within an AuthProvider');
+  return value;
 };

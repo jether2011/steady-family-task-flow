@@ -2,7 +2,7 @@ import React from 'react';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 
@@ -49,10 +49,25 @@ vi.mock('@/api/client', () => ({
 // session exists (the backend creates responsible_user + family only there).
 // Mock the family api so we can assert that bootstrap happens and keep the test
 // off the network.
-const meMock = vi.hoisted(() => vi.fn(async () => ({
-  family: { id: 'fam-1', name: 'My Family', relationship: null, responsible_name: null },
-  responsibleUser: { id: 'resp-1', email: 'parent@example.com', avatar_url: null },
-})));
+const meMock = vi.hoisted(() =>
+  vi.fn(async () => ({
+    family: {
+      id: 'fam-1',
+      name: 'My Family',
+      relationship: null,
+      responsible_name: null,
+    },
+    state: 'READY',
+    user: { id: 'app-1', displayName: 'Parent', avatarUrl: null },
+    membership: {
+      id: 'membership-1',
+      role: 'OWNER',
+      memberId: null,
+      accessVersion: 1,
+    },
+    capabilities: ['family:manage'],
+  })),
+);
 vi.mock('@/api/family.api', () => ({
   family: { me: meMock, get: vi.fn(), update: vi.fn() },
 }));
@@ -95,7 +110,9 @@ describe('Login screen (R1.8)', () => {
       </AuthProvider>,
     );
 
-    const button = await screen.findByRole('button', { name: /continue with google/i });
+    const button = await screen.findByRole('button', {
+      name: /continue with google/i,
+    });
     expect(button).toBeInTheDocument();
   });
 
@@ -108,7 +125,9 @@ describe('Login screen (R1.8)', () => {
       </AuthProvider>,
     );
 
-    const button = await screen.findByRole('button', { name: /continue with google/i });
+    const button = await screen.findByRole('button', {
+      name: /continue with google/i,
+    });
     await user.click(button);
 
     await waitFor(() => {
@@ -168,7 +187,7 @@ describe('ProtectedRoute gating (R1.8 / R24.5)', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('bootstraps the backend family via GET /me once a session exists', async () => {
+  it('resolves backend membership via GET /me once a session exists', async () => {
     // Regression: PATCH /family returned 404 because the frontend never called
     // GET /me, so the backend never created the responsible_user + family rows.
     // The AuthProvider must bootstrap /me when authenticated.
@@ -220,11 +239,79 @@ describe('ProtectedRoute gating (R1.8 / R24.5)', () => {
   });
 });
 
+describe('membership resolution lifecycle', () => {
+  it('does not restore delayed family resolution after logout', async () => {
+    setSession(AUTHENTICATED_SESSION);
+    let finish;
+    meMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    let value;
+    function Probe() {
+      value = useAuth();
+      return null;
+    }
+    render(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>,
+    );
+    await waitFor(() => expect(finish).toBeDefined());
+    await act(async () => {
+      await value.logout();
+    });
+    await act(async () => {
+      finish({
+        state: 'READY',
+        family: { id: 'old-family' },
+        membership: { role: 'OWNER', accessVersion: 1 },
+      });
+    });
+    expect(value.user).toBeNull();
+    expect(value.access).toBeNull();
+    expect(value.isAuthenticated).toBe(false);
+  });
+  it('exposes NO_ACCESS without starting another OAuth redirect', async () => {
+    setSession(AUTHENTICATED_SESSION);
+    meMock.mockResolvedValueOnce({
+      state: 'NO_ACCESS',
+      user: { id: 'app-1' },
+      family: null,
+      membership: null,
+      capabilities: [],
+    });
+    render(
+      <AuthProvider>
+        <MemoryRouter>
+          <Routes>
+            <Route element={<ProtectedRoute />}>
+              <Route path="/" element={<div>Protected content</div>} />
+            </Route>
+          </Routes>
+        </MemoryRouter>
+      </AuthProvider>,
+    );
+    expect(await screen.findByText('No family access')).toBeInTheDocument();
+    expect(signInWithOAuth).not.toHaveBeenCalled();
+    expect(screen.queryByText('Protected content')).not.toBeInTheDocument();
+  });
+});
+
 describe('removed email/password + consent pages are gone (R1.8)', () => {
-  const removedPages = ['Register', 'ForgotPassword', 'ResetPassword', 'OAuthConsent'];
+  const removedPages = [
+    'Register',
+    'ForgotPassword',
+    'ResetPassword',
+    'OAuthConsent',
+  ];
 
   it.each(removedPages)('src/pages/%s.jsx does not exist', (page) => {
-    const path = fileURLToPath(new URL(`../pages/${page}.jsx`, import.meta.url));
+    const path = fileURLToPath(
+      new URL(`../pages/${page}.jsx`, import.meta.url),
+    );
     expect(existsSync(path)).toBe(false);
   });
 

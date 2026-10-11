@@ -11,7 +11,12 @@
  */
 
 import { get, post, patch, request } from './client';
-import type { Member, MemberCreate, MemberUpdate } from './types';
+import type {
+  Member,
+  MemberCreate,
+  MemberUpdate,
+  AccessSummary,
+} from './types';
 
 interface MembersEnvelope {
   members: Member[];
@@ -68,15 +73,47 @@ export async function remove(
   id: string,
   signal?: AbortSignal,
 ): Promise<Member> {
-  const res = await request<MemberEnvelope>(
-    'DELETE',
-    `/family/members/${id}`,
-    { signal },
-  );
+  const res = await request<MemberEnvelope>('DELETE', `/family/members/${id}`, {
+    signal,
+  });
   return res.member;
 }
 
+export async function getAccess(id: string): Promise<AccessSummary | null> {
+  return (
+    await get<{ access: AccessSummary | null }>(`/family/members/${id}/access`)
+  ).access;
+}
+export async function setAccess(
+  id: string,
+  body: {
+    enabled: boolean;
+    email?: string;
+    role?: 'MEMBER' | 'MANAGER';
+    expectedVersion: number;
+  },
+): Promise<AccessSummary | null> {
+  return (
+    await patch<{ access: AccessSummary | null }>(
+      `/family/members/${id}/access`,
+      body,
+    )
+  ).access;
+}
+export async function changeEmail(
+  id: string,
+  email: string,
+  expectedVersion: number,
+) {
+  return post<{ status: string; expiresAt: string }>(
+    `/family/members/${id}/access/email-change`,
+    { email, expectedVersion },
+  );
+}
 export const members = {
+  getAccess,
+  setAccess,
+  changeEmail,
   list,
   create,
   update,

@@ -1,3 +1,5 @@
+import type { TaskRow } from '../../shared/types/index.js';
+import { resourceWrite } from '../access/access.repository.js';
 /**
  * Template repository — the ONLY layer in this module that talks to Supabase.
  *
@@ -27,7 +29,10 @@
 import type { TaskTemplateRow } from '../../shared/types/index.js';
 import { getServiceRoleClient } from '../../config/supabase.js';
 import { STATUS } from '../../shared/constants/index.js';
-import type { TemplateCreateInput, TemplateUpdateInput } from './template.schemas.js';
+import type {
+  TemplateCreateInput,
+  TemplateUpdateInput,
+} from './template.schemas.js';
 
 /**
  * Postgres `unique_violation` SQLSTATE. Supabase surfaces it on the error's
@@ -62,7 +67,9 @@ const TEMPLATE_COLUMNS =
  *
  * @param familyId Session-derived `families.id` (R12.1).
  */
-export async function listTemplates(familyId: string): Promise<TaskTemplateRow[]> {
+export async function listTemplates(
+  familyId: string,
+): Promise<TaskTemplateRow[]> {
   const db = getServiceRoleClient();
 
   const { data, error } = await db
@@ -94,8 +101,6 @@ export async function createTemplate(
   familyId: string,
   input: TemplateCreateInput,
 ): Promise<TaskTemplateRow> {
-  const db = getServiceRoleClient();
-
   const insert: Record<string, unknown> = {
     family_id: familyId,
     title: input.title,
@@ -112,15 +117,14 @@ export async function createTemplate(
     insert.recurrence_config = input.recurrence_config;
   }
 
-  const { data, error } = await db
-    .from('task_templates')
-    .insert(insert)
-    .select(TEMPLATE_COLUMNS)
-    .single<TaskTemplateRow>();
-
-  if (error) {
-    throw error;
-  }
+  const written = await resourceWrite<TaskTemplateRow>(
+    'task_templates',
+    'insert',
+    familyId,
+    null,
+    insert,
+  );
+  const data = written[0]!;
 
   return data;
 }
@@ -134,7 +138,9 @@ export async function createTemplate(
  *
  * @param id The `task_templates.id` from the `:id` path param.
  */
-export async function findTemplateById(id: string): Promise<TaskTemplateRow | null> {
+export async function findTemplateById(
+  id: string,
+): Promise<TaskTemplateRow | null> {
   const db = getServiceRoleClient();
 
   const { data, error } = await db
@@ -167,19 +173,14 @@ export async function updateTemplate(
   id: string,
   patch: TemplateUpdateInput,
 ): Promise<TaskTemplateRow> {
-  const db = getServiceRoleClient();
-
-  const { data, error } = await db
-    .from('task_templates')
-    .update(patch)
-    .eq('id', id)
-    .eq('family_id', familyId)
-    .select(TEMPLATE_COLUMNS)
-    .single<TaskTemplateRow>();
-
-  if (error) {
-    throw error;
-  }
+  const written = await resourceWrite<TaskTemplateRow>(
+    'task_templates',
+    'update',
+    familyId,
+    id,
+    patch,
+  );
+  const data = written[0]!;
 
   return data;
 }
@@ -193,18 +194,17 @@ export async function updateTemplate(
  * @param familyId Session-derived `families.id` (R12.4).
  * @param id       The template id to deactivate.
  */
-export async function deactivateTemplate(familyId: string, id: string): Promise<void> {
-  const db = getServiceRoleClient();
-
-  const { error } = await db
-    .from('task_templates')
-    .update({ active: false })
-    .eq('id', id)
-    .eq('family_id', familyId);
-
-  if (error) {
-    throw error;
-  }
+export async function deactivateTemplate(
+  familyId: string,
+  id: string,
+): Promise<void> {
+  await resourceWrite<TaskTemplateRow>(
+    'task_templates',
+    'update',
+    familyId,
+    id,
+    { active: false },
+  );
 }
 
 /* ------------------------------------------------------------------------- *
@@ -220,7 +220,9 @@ export async function deactivateTemplate(familyId: string, id: string): Promise<
  *
  * @param familyId Session-derived `families.id` (R13.1).
  */
-export async function listActiveTemplates(familyId: string): Promise<TaskTemplateRow[]> {
+export async function listActiveTemplates(
+  familyId: string,
+): Promise<TaskTemplateRow[]> {
   const db = getServiceRoleClient();
 
   const { data, error } = await db
@@ -300,22 +302,27 @@ export async function findExistingTemplateDueKeys(
  * @param insert The generated-task fields.
  * @returns `true` if a new row was inserted, `false` if it already existed.
  */
-export async function insertGeneratedTask(insert: GeneratedTaskInsert): Promise<boolean> {
-  const db = getServiceRoleClient();
-
-  const { error } = await db.from('tasks').insert({
-    family_id: insert.familyId,
-    template_id: insert.templateId,
-    created_by_user_id: insert.createdByUserId,
-    title: insert.title,
-    description: insert.description,
-    assigned_member_id: insert.assignedMemberId,
-    points: insert.points,
-    priority: insert.priority,
-    status: STATUS.TODO,
-    due_date: insert.dueDate,
-    week_start: insert.weekStart,
-  });
+export async function insertGeneratedTask(
+  insert: GeneratedTaskInsert,
+): Promise<boolean> {
+  let error: unknown = null;
+  try {
+    await resourceWrite<TaskRow>('tasks', 'insert', insert.familyId, null, {
+      family_id: insert.familyId,
+      template_id: insert.templateId,
+      created_by_user_id: insert.createdByUserId,
+      title: insert.title,
+      description: insert.description,
+      assigned_member_id: insert.assignedMemberId,
+      points: insert.points,
+      priority: insert.priority,
+      status: STATUS.TODO,
+      due_date: insert.dueDate,
+      week_start: insert.weekStart,
+    });
+  } catch (cause) {
+    error = cause;
+  }
 
   if (error) {
     // A duplicate (template_id, due_date) is the idempotency backstop firing —
