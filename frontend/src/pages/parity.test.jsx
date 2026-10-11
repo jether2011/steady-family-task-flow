@@ -93,6 +93,11 @@ vi.mock('@/hooks/useRealtime', () => ({
   default: () => ({ realtimeConnected: false }),
 }));
 
+// Onboarding reads the Google profile via useAuth to prefill "Your name".
+vi.mock('@/lib/AuthContext', () => ({
+  useAuth: () => ({ user: { full_name: 'Tester', email: 'tester@example.com' } }),
+}));
+
 // <Board /> renders <TaskModal />, which pulls the authenticated session via
 // useAuth(). The modal is not under test here (board task *rendering* is), so
 // stub it to a no-op to avoid wiring an AuthProvider.
@@ -348,15 +353,16 @@ describe('Onboarding appears for a first-login user with no members (R20.3)', ()
 
     renderWithProviders(<Onboarding />);
 
-    // Welcome / setup copy and the two first-run actions.
+    // Welcome / setup copy and the single "Create family" action (the sample
+    // data option was removed).
     expect(
       screen.getByRole('heading', { name: /welcome to famtask/i }),
     ).toBeInTheDocument();
     expect(screen.getByLabelText(/family name/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /start fresh/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /create family/i })).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: /load sample family/i }),
-    ).toBeInTheDocument();
+      screen.queryByRole('button', { name: /sample/i }),
+    ).not.toBeInTheDocument();
   });
 });
 

@@ -369,3 +369,53 @@ describe('request body serialization', () => {
     expect(headers['Content-Type']).toBeUndefined();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Transport failures -> typed ApiError (bugfix: Onboarding "Create family"
+// showed a cryptic raw "Failed to fetch" when the backend was unreachable).
+// A rejected fetch (connection refused, DNS, CORS block, wrong VITE_API_URL)
+// must surface as an ApiError with a meaningful message, NOT a raw TypeError.
+// ---------------------------------------------------------------------------
+
+describe('network / transport failures are normalized to ApiError', () => {
+  beforeEach(() => {
+    configureApiClient({ getAccessToken: () => 'tok', onUnauthorized: () => {} });
+  });
+
+  it('converts a rejected fetch (TypeError: Failed to fetch) into a typed ApiError', async () => {
+    fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
+
+    const err = await request('PATCH', '/family', { body: { name: 'X' } }).catch(
+      (e) => e,
+    );
+
+    expect(err).toBeInstanceOf(ApiError);
+    expect(err).toBeInstanceOf(Error);
+    expect((err as ApiError).code).toBe('NETWORK_ERROR');
+    expect((err as ApiError).status).toBe(0);
+    // The message is actionable: it names the base URL and the likely causes,
+    // so the Onboarding toast is meaningful instead of "Failed to fetch".
+    expect((err as ApiError).message).toContain(API_BASE_URL);
+    expect((err as ApiError).message).not.toBe('Failed to fetch');
+  });
+
+  it('does not call onUnauthorized for a transport failure (it is not a 401)', async () => {
+    const onUnauthorized = vi.fn();
+    configureApiClient({ getAccessToken: () => 'tok', onUnauthorized });
+    fetchMock.mockRejectedValue(new TypeError('Failed to fetch'));
+
+    await request('GET', '/family').catch(() => {});
+
+    expect(onUnauthorized).not.toHaveBeenCalled();
+  });
+
+  it('re-throws an AbortError untouched (query cancellation is not a network failure)', async () => {
+    const abort = new DOMException('The operation was aborted.', 'AbortError');
+    fetchMock.mockRejectedValue(abort);
+
+    const err = await request('GET', '/family').catch((e) => e);
+
+    expect(err).toBe(abort);
+    expect(err).not.toBeInstanceOf(ApiError);
+  });
+});

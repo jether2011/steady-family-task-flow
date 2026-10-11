@@ -128,3 +128,24 @@ export function computeProgress(tasks) {
   const percentage = total === 0 ? 0 : Math.round((completed / total) * 100);
   return { total, completed, percentage };
 }
+
+// ---------------------------------------------------------------------------
+// Onboarding gate
+// ---------------------------------------------------------------------------
+// A family row is ALWAYS created on first login (GET /me bootstraps a default
+// "My Family" with relationship = null and responsible_name = null). So the
+// mere existence of a family does NOT mean the user has finished setup. The
+// onboarding step is what fills in the responsible adult's relationship and
+// display name, so we treat a family as "configured" only once BOTH of those
+// are present. This is the single source of truth for the onboarding gate,
+// used by Layout (redirect to /onboarding when not configured) and Onboarding
+// (redirect to / when already configured).
+export function isFamilyConfigured(family) {
+  if (!family) return false;
+  const hasRelationship =
+    typeof family.relationship === 'string' && family.relationship.length > 0;
+  const hasResponsibleName =
+    typeof family.responsible_name === 'string' &&
+    family.responsible_name.trim().length > 0;
+  return hasRelationship && hasResponsibleName;
+}

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { useCreateFamily, useSaveMember, useSaveTask } from '@/hooks/useFamily';
+import { useCreateFamily, useFamily } from '@/hooks/useFamily';
+import { useAuth } from '@/lib/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,8 +14,8 @@ import {
   SelectContent,
   SelectItem
 } from '@/components/ui/select';
-import { MEMBER_COLORS, RELATIONSHIP_LABELS, getWeekStart, todayKey } from '@/lib/familyUtils';
-import { Loader2, Sparkles, Users, ArrowRight } from 'lucide-react';
+import { RELATIONSHIP_LABELS, isFamilyConfigured } from '@/lib/familyUtils';
+import { Loader2, ArrowRight } from 'lucide-react';
 
 const RELATIONSHIPS = ['FATHER', 'MOTHER', 'GUARDIAN', 'OTHER'];
 
@@ -22,20 +23,53 @@ export default function Onboarding() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const { data: family, isLoading } = useFamily();
+
   // The family is auto-created on first `/me` login, so onboarding only ever
   // UPDATES the existing household profile (PATCH /family) — it never creates a
   // second family. `useCreateFamily` maps to that PATCH update.
   const createFamily = useCreateFamily();
-  const saveMember = useSaveMember();
-  const saveTask = useSaveTask();
-  const [form, setForm] = useState({ name: '', responsible_name: '', relationship: 'FATHER' });
-  const [loadingSample, setLoadingSample] = useState(false);
+
+  // Prefill the responsible name from the verified Google profile so the user
+  // usually only has to pick a role and confirm.
+  const [form, setForm] = useState({
+    name: '',
+    responsible_name: '',
+    relationship: 'FATHER'
+  });
+  const [initialized, setInitialized] = useState(false);
+
+  // Seed the form once the family + user have loaded (family.name may already
+  // be the default "My Family"; the Google full_name seeds "Your name").
+  if (!initialized && family) {
+    setForm({
+      name: family.name && family.name !== 'My Family' ? family.name : '',
+      responsible_name: user?.full_name || '',
+      relationship: family.relationship || 'FATHER'
+    });
+    setInitialized(true);
+  }
+
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  const errorMessage = (err) =>
+    (err && typeof err.message === 'string' && err.message.trim()) ||
+    'Something went wrong. Please try again.';
+
+  // Already finished setup? Don't show onboarding again — go to the dashboard.
+  if (!isLoading && isFamilyConfigured(family)) {
+    return <Navigate to="/" replace />;
+  }
 
   const handleCreate = async (e) => {
     e.preventDefault();
     if (!form.name.trim()) {
       toast({ title: 'Family name is required', variant: 'destructive' });
+      return;
+    }
+    if (!form.responsible_name.trim()) {
+      toast({ title: 'Your name is required', variant: 'destructive' });
       return;
     }
     try {
@@ -44,76 +78,22 @@ export default function Onboarding() {
         responsible_name: form.responsible_name.trim(),
         relationship: form.relationship
       });
+      // Make the freshly-configured family authoritative before navigating so
+      // Layout sees it as configured and renders the app (not a redirect loop).
       await qc.refetchQueries({ queryKey: ['family'] });
       navigate('/', { replace: true });
     } catch (err) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      toast({ title: 'Error', description: errorMessage(err), variant: 'destructive' });
     }
   };
 
-  const handleSample = async () => {
-    setLoadingSample(true);
-    try {
-      const today = todayKey();
-      const ws = getWeekStart(today);
-
-      // 1) Update the auto-created family profile (PATCH /family). The backend
-      // derives family_id/ownership from the session, so no ids are sent.
-      await createFamily.mutateAsync({
-        name: 'Rodrigues Family',
-        responsible_name: 'Jether',
-        relationship: 'FATHER'
-      });
-
-      // 2) Create the sample members (POST /family/members). The server sets
-      // family_id and active defaults; we only supply the member fields.
-      const sampleMembers = [
-        { name: 'Ana', member_type: 'PARENT', color: MEMBER_COLORS[1] },
-        { name: 'Lucas', member_type: 'CHILD', color: MEMBER_COLORS[0] },
-        { name: 'Marina', member_type: 'CHILD', color: MEMBER_COLORS[2] },
-        { name: 'Pedro', member_type: 'DEPENDENT', color: MEMBER_COLORS[3] }
-      ];
-      const [ana, lucas, marina, pedro] = await Promise.all(
-        sampleMembers.map((m) => saveMember.mutateAsync({ data: m }))
-      );
-
-      // 3) Create the starter tasks (POST /family/tasks), assigning each to a
-      // freshly created member. family_id/created_by_user_id are derived server
-      // side from the session.
-      const sampleTasks = [
-        { title: 'Make bed', member: lucas, points: 5, priority: 'MEDIUM' },
-        { title: 'Feed the dog', member: lucas, points: 10, priority: 'HIGH' },
-        { title: 'Homework', member: marina, points: 15, priority: 'HIGH' },
-        { title: 'Clean bedroom', member: marina, points: 20, priority: 'MEDIUM' },
-        { title: 'Water plants', member: pedro, points: 10, priority: 'LOW' },
-        { title: 'Wash dishes', member: ana, points: 15, priority: 'MEDIUM' }
-      ];
-      await Promise.all(
-        sampleTasks.map((t) =>
-          saveTask.mutateAsync({
-            data: {
-              title: t.title,
-              assigned_member_id: t.member.id,
-              status: 'TODO',
-              priority: t.priority,
-              points: t.points,
-              due_date: today,
-              week_start: ws
-            }
-          })
-        )
-      );
-
-      await qc.refetchQueries({ queryKey: ['family'] });
-      await qc.invalidateQueries({ queryKey: ['members'] });
-      await qc.invalidateQueries({ queryKey: ['tasks'] });
-      navigate('/', { replace: true });
-    } catch (err) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
-    } finally {
-      setLoadingSample(false);
-    }
-  };
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-accent via-background to-background p-4">
@@ -148,6 +128,7 @@ export default function Onboarding() {
                 value={form.responsible_name}
                 onChange={(e) => set('responsible_name', e.target.value)}
                 placeholder="e.g. Jether"
+                required
               />
             </div>
             <div className="space-y-1.5">
@@ -167,37 +148,9 @@ export default function Onboarding() {
               ) : (
                 <ArrowRight className="w-4 h-4 mr-2" />
               )}
-              Start fresh
+              Create family
             </Button>
           </form>
-
-          <div className="relative my-5">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-border" />
-            </div>
-            <div className="relative flex justify-center">
-              <span className="bg-card px-3 text-xs text-muted-foreground">or</span>
-            </div>
-          </div>
-
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full h-11"
-            onClick={handleSample}
-            disabled={loadingSample}
-          >
-            {loadingSample ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            ) : (
-              <Sparkles className="w-4 h-4 mr-2" />
-            )}
-            Load sample family
-          </Button>
-          <p className="text-[11px] text-muted-foreground text-center mt-3 inline-flex items-center justify-center gap-1 w-full">
-            <Users className="w-3 h-3" />
-            Creates the Rodrigues family with 4 members and 6 tasks
-          </p>
         </div>
       </div>
     </div>

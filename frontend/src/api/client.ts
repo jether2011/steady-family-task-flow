@@ -198,7 +198,27 @@ export async function request<T>(
     init.body = JSON.stringify(body);
   }
 
-  const res = await fetch(url, init);
+  let res: Response;
+  try {
+    res = await fetch(url, init);
+  } catch (cause) {
+    // A rejected `fetch` is a TRANSPORT failure, not an HTTP error response:
+    // the backend was unreachable (dev server not running / wrong VITE_API_URL),
+    // the connection was refused, DNS failed, or the browser blocked the request
+    // (e.g. a CORS failure). Without this, the raw `TypeError: Failed to fetch`
+    // bubbles up and callers (e.g. the Onboarding toast) show a cryptic message
+    // with no `code`/`status`. Re-throw an AbortError untouched so TanStack
+    // Query cancellation is not misreported as a network failure; otherwise
+    // normalize to a typed ApiError so every caller gets an actionable message.
+    if (cause instanceof DOMException && cause.name === 'AbortError') {
+      throw cause;
+    }
+    throw new ApiError(
+      'NETWORK_ERROR',
+      `Cannot reach the server at ${API_BASE_URL}. Is the backend running and is VITE_API_URL correct?`,
+      0,
+    );
+  }
 
   if (!res.ok) {
     const err = await parseErrorContract(res);

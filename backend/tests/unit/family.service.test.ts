@@ -218,3 +218,49 @@ describe('FamilyUpdate schema — invalid relationship is 422-bound (R2.3)', () 
     expect(FamilyUpdate.safeParse({}).success).toBe(true);
   });
 });
+
+describe('Onboarding "Create family" payload (regression)', () => {
+  // The Onboarding page submits exactly { name, responsible_name, relationship }
+  // to PATCH /family (useCreateFamily -> family.update). This pins that the
+  // strict schema ACCEPTS that body and the service routes it through the
+  // atomic RPC, so the create-family flow cannot silently 422 on a valid form.
+  it('accepts the exact flat body the Onboarding form sends', () => {
+    const body = {
+      name: 'Rodrigues Family',
+      responsible_name: 'Jether',
+      relationship: 'FATHER',
+    };
+    const parsed = FamilyUpdate.safeParse(body);
+    expect(parsed.success).toBe(true);
+  });
+
+  it('accepts the body when the optional "Your name" field is left blank', () => {
+    // The form's responsible_name input is optional; a blank value trims to ''.
+    const parsed = FamilyUpdate.safeParse({
+      name: 'Rodrigues Family',
+      responsible_name: '',
+      relationship: 'FATHER',
+    });
+    expect(parsed.success).toBe(true);
+  });
+
+  it('routes the Onboarding patch through the atomic RPC with session identity', async () => {
+    updateFamilyAtomic.mockResolvedValue();
+    loadFamilyAndResponsible.mockResolvedValue({
+      family: familyRow({ name: 'Rodrigues Family' }),
+      responsible: responsibleRow({ relationship: 'FATHER', name: 'Jether' }),
+    });
+
+    const patch: FamilyUpdateInput = {
+      name: 'Rodrigues Family',
+      responsible_name: 'Jether',
+      relationship: 'FATHER',
+    };
+    const dto = await updateFamily(CTX, patch);
+
+    expect(updateFamilyAtomic).toHaveBeenCalledWith('fam-1', 'user-1', patch);
+    expect(dto.name).toBe('Rodrigues Family');
+    expect(dto.relationship).toBe('FATHER');
+    expect(dto.responsible_name).toBe('Jether');
+  });
+});

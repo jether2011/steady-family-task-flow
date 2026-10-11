@@ -241,3 +241,67 @@ describe('notFoundHandler — unmatched routes share the contract', () => {
     expect(inner.message.length).toBeGreaterThan(0);
   });
 });
+
+describe('errorHandler — framework (Fastify) client errors keep their 4xx status', () => {
+  it('maps an empty-JSON-body error (FST_ERR_CTP_EMPTY_JSON_BODY, 400) to 400, not 500', () => {
+    // Reproduces the real failure: POST with Content-Type: application/json and
+    // an empty body. Fastify throws this before the handler; it must surface as
+    // a 400 with the framework code, not collapse into a generic 500.
+    const err = Object.assign(
+      new Error("Body cannot be empty when content-type is set to 'application/json'"),
+      { statusCode: 400, code: 'FST_ERR_CTP_EMPTY_JSON_BODY', name: 'FastifyError' },
+    );
+    const reply = makeReply();
+    errorHandler(err, makeRequest() as unknown as FastifyRequest, reply as unknown as FastifyReply);
+
+    const { status, body } = captured(reply);
+    expect(status).toBe(400);
+    expect(body).toEqual({
+      error: {
+        code: 'FST_ERR_CTP_EMPTY_JSON_BODY',
+        message: "Body cannot be empty when content-type is set to 'application/json'",
+      },
+    });
+  });
+
+  it('maps a 413 payload-too-large to 413 with its framework code', () => {
+    const err = Object.assign(new Error('Request body is too large'), {
+      statusCode: 413,
+      code: 'FST_ERR_CTP_BODY_TOO_LARGE',
+      name: 'FastifyError',
+    });
+    const reply = makeReply();
+    errorHandler(err, makeRequest() as unknown as FastifyRequest, reply as unknown as FastifyReply);
+
+    const { status, body } = captured(reply);
+    expect(status).toBe(413);
+    expect((body as { error: { code: string } }).error.code).toBe('FST_ERR_CTP_BODY_TOO_LARGE');
+  });
+
+  it('falls back to BAD_REQUEST code when a 4xx framework error has no code', () => {
+    const err = Object.assign(new Error('bad'), { statusCode: 400 });
+    const reply = makeReply();
+    errorHandler(err, makeRequest() as unknown as FastifyRequest, reply as unknown as FastifyReply);
+
+    const { status, body } = captured(reply);
+    expect(status).toBe(400);
+    expect((body as { error: { code: string } }).error.code).toBe('BAD_REQUEST');
+  });
+
+  it('still returns 500 INTERNAL for a 5xx framework error (internals not leaked)', () => {
+    const err = Object.assign(new Error('upstream exploded with secret sql'), {
+      statusCode: 503,
+      code: 'FST_ERR_SOMETHING',
+      name: 'FastifyError',
+    });
+    const request = makeRequest();
+    const reply = makeReply();
+    errorHandler(err, request as unknown as FastifyRequest, reply as unknown as FastifyReply);
+
+    const { status, body } = captured(reply);
+    expect(status).toBe(500);
+    expect(body).toEqual({ error: { code: 'INTERNAL', message: 'Internal Server Error' } });
+    // 5xx is logged in full server-side.
+    expect(request.log.error).toHaveBeenCalledTimes(1);
+  });
+});

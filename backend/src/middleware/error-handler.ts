@@ -124,6 +124,38 @@ export function errorHandler(
     return;
   }
 
+  // 2d. Framework-level client errors (Fastify) carry a numeric `statusCode`
+  //     in the 4xx range — e.g. an empty body with `Content-Type: application/
+  //     json` (FST_ERR_CTP_EMPTY_JSON_BODY, 400), an unsupported media type, or
+  //     a payload-too-large (413). These are the CALLER's fault, not a server
+  //     bug, so they must keep their 4xx status instead of collapsing into a
+  //     generic 500. We surface the framework `code` (safe, e.g.
+  //     `FST_ERR_CTP_EMPTY_JSON_BODY`) and a client-safe message. 5xx framework
+  //     errors fall through to the INTERNAL bucket below.
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'statusCode' in error &&
+    typeof (error as { statusCode?: unknown }).statusCode === 'number'
+  ) {
+    const statusCode = (error as { statusCode: number }).statusCode;
+    if (statusCode >= 400 && statusCode < 500) {
+      const rawCode = (error as { code?: unknown }).code;
+      const code =
+        typeof rawCode === 'string' && rawCode.length > 0 ? rawCode : 'BAD_REQUEST';
+      // Fastify's own messages for these framework errors are generic and
+      // value-free (they describe the transport problem, not request contents),
+      // so they are safe to pass through; fall back to a fixed message otherwise.
+      const rawMessage = (error as { message?: unknown }).message;
+      const message =
+        typeof rawMessage === 'string' && rawMessage.length > 0
+          ? rawMessage
+          : 'Bad request.';
+      void reply.status(statusCode).send(contract(code, message));
+      return;
+    }
+  }
+
   // 3. Anything else is unexpected. Log the full error server-side (stack, cause,
   //    any DB/SQL text) for debugging, but return only a generic INTERNAL body so
   //    internals never reach the client (R25.3).

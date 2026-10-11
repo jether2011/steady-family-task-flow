@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavLink, Outlet, Navigate } from 'react-router-dom';
 import { useFamily } from '@/hooks/useFamily';
+import { isFamilyConfigured } from '@/lib/familyUtils';
 import { useAuth } from '@/lib/AuthContext';
 import {
   LayoutDashboard,
@@ -78,7 +79,10 @@ export default function Layout() {
     );
   }
 
-  if (!family) {
+  // The family row always exists after login (auto-created by GET /me), so the
+  // gate is "has the user finished onboarding?", not "does a family exist?".
+  // Until relationship + responsible_name are set, send the user to onboarding.
+  if (!isFamilyConfigured(family)) {
     return <Navigate to="/onboarding" replace />;
   }
 
