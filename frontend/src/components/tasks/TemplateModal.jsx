@@ -19,7 +19,6 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { useSaveTemplate } from '@/hooks/useFamily';
-import { useAuth } from '@/lib/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { PRIORITY_LABELS, RECURRENCE_LABELS, WEEKDAY_LABELS, MEMBER_COLORS } from '@/lib/familyUtils';
 import { Loader2 } from 'lucide-react';
@@ -29,7 +28,6 @@ const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
 const RECURRENCE_TYPES = ['DAILY', 'WEEKDAYS', 'WEEKLY', 'CUSTOM'];
 
 export default function TemplateModal({ open, onOpenChange, template, members, family }) {
-  const { user } = useAuth();
   const { toast } = useToast();
   const saveTemplate = useSaveTemplate();
 
@@ -90,23 +88,31 @@ export default function TemplateModal({ open, onOpenChange, template, members, f
       toast({ title: 'Pick at least one day for custom recurrence', variant: 'destructive' });
       return;
     }
-    const payload = {
+    // Only backend-accepted fields. family_id/owner_id are session-derived;
+    // `active` is editable only via PATCH (create defaults it true). Optional id
+    // fields are null (never '' — not a valid uuid). The strict schema rejects
+    // any extra key with 422.
+    const desc = form.description.trim();
+    const base = {
       title: form.title.trim(),
-      description: form.description.trim(),
-      assigned_member_id: form.assigned_member_id || '',
+      description: desc ? desc : null,
+      assigned_member_id: form.assigned_member_id || null,
       points: Number(form.points) || 0,
       priority: form.priority,
-      recurrence_type: form.recurrence_type,
-      recurrence_config: form.recurrence_type === 'CUSTOM' ? { days: form.days } : {},
-      active: form.active
+      recurrence_type: form.recurrence_type
     };
+    // recurrence_config is only valid when it carries a non-empty `days` array
+    // (the backend schema requires `days`). Send it ONLY for CUSTOM; omit it
+    // entirely otherwise (it is optional) instead of sending `{}`, which fails
+    // validation because `days` is missing.
+    if (form.recurrence_type === 'CUSTOM') {
+      base.recurrence_config = { days: form.days };
+    }
     try {
       if (template) {
-        await saveTemplate.mutateAsync({ id: template.id, data: payload });
+        await saveTemplate.mutateAsync({ id: template.id, data: { ...base, active: form.active } });
       } else {
-        await saveTemplate.mutateAsync({
-          data: { ...payload, family_id: family.id, owner_id: user.id }
-        });
+        await saveTemplate.mutateAsync({ data: base });
       }
       onOpenChange(false);
       toast({ title: template ? 'Template updated' : 'Template created' });

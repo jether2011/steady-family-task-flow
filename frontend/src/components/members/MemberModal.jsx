@@ -18,7 +18,6 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { useSaveMember } from '@/hooks/useFamily';
-import { useAuth } from '@/lib/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { MEMBER_COLORS, MEMBER_TYPE_LABELS } from '@/lib/familyUtils';
 import { Loader2, Check } from 'lucide-react';
@@ -27,7 +26,6 @@ import { cn } from '@/lib/utils';
 const MEMBER_TYPES = ['PARENT', 'CHILD', 'DEPENDENT'];
 
 export default function MemberModal({ open, onOpenChange, member, family }) {
-  const { user } = useAuth();
   const { toast } = useToast();
   const saveMember = useSaveMember();
 
@@ -69,24 +67,23 @@ export default function MemberModal({ open, onOpenChange, member, family }) {
       toast({ title: 'Name is required', variant: 'destructive' });
       return;
     }
-    const payload = {
+    // Only the fields the backend accepts. `family_id`/ownership is derived
+    // from the session server-side (never sent by the client), and `active`
+    // defaults to true on create and is editable only via PATCH — the strict
+    // create schema rejects any extra key with 422 VALIDATION.
+    const base = {
       name: form.name.trim(),
       member_type: form.member_type,
       color: form.color,
-      birth_year: form.birth_year ? Number(form.birth_year) : null,
-      active: form.active
+      birth_year: form.birth_year ? Number(form.birth_year) : null
     };
     try {
       if (member) {
-        await saveMember.mutateAsync({ id: member.id, data: payload });
+        // Update allows toggling `active`.
+        await saveMember.mutateAsync({ id: member.id, data: { ...base, active: form.active } });
       } else {
-        await saveMember.mutateAsync({
-          data: {
-            ...payload,
-            family_id: family.id,
-            owner_id: user.id
-          }
-        });
+        // Create: no family_id, no owner_id, no active.
+        await saveMember.mutateAsync({ data: base });
       }
       onOpenChange(false);
       toast({ title: member ? 'Member updated' : 'Member added' });

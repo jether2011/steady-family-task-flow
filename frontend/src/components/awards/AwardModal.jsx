@@ -12,7 +12,6 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { useSaveAward } from '@/hooks/useFamily';
-import { useAuth } from '@/lib/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { MEMBER_COLORS } from '@/lib/familyUtils';
 import { Loader2 } from 'lucide-react';
@@ -21,7 +20,6 @@ import { cn } from '@/lib/utils';
 const EMOJI_CHOICES = ['🎁', '🏆', '⭐', '🎮', '🍦', '🎯', '💎', '🍕', '🎬', '🎈', '📚', '🚀'];
 
 export default function AwardModal({ open, onOpenChange, award, family }) {
-  const { user } = useAuth();
   const { toast } = useToast();
   const saveAward = useSaveAward();
 
@@ -70,21 +68,22 @@ export default function AwardModal({ open, onOpenChange, award, family }) {
       toast({ title: 'Points cost must be greater than 0', variant: 'destructive' });
       return;
     }
-    const payload = {
+    // Only backend-accepted fields; family_id/owner_id are session-derived and
+    // `active` is editable only via PATCH (create defaults it true). The strict
+    // schema rejects any extra key with 422.
+    const desc = form.description.trim();
+    const base = {
       title: form.title.trim(),
-      description: form.description.trim(),
+      description: desc ? desc : null,
       points_cost: Number(form.points_cost) || 0,
       icon: form.icon || '🎁',
-      color: form.color,
-      active: form.active
+      color: form.color
     };
     try {
       if (award) {
-        await saveAward.mutateAsync({ id: award.id, data: payload });
+        await saveAward.mutateAsync({ id: award.id, data: { ...base, active: form.active } });
       } else {
-        await saveAward.mutateAsync({
-          data: { ...payload, family_id: family.id, owner_id: user.id }
-        });
+        await saveAward.mutateAsync({ data: base });
       }
       onOpenChange(false);
       toast({ title: award ? 'Award updated' : 'Award created' });

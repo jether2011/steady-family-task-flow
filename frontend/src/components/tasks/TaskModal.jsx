@@ -18,7 +18,6 @@ import {
   SelectItem
 } from '@/components/ui/select';
 import { useSaveTask } from '@/hooks/useFamily';
-import { useAuth } from '@/lib/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
 import { PRIORITY_LABELS, STATUS_LABELS, STATUS_ORDER, getWeekStart } from '@/lib/familyUtils';
 import { Loader2 } from 'lucide-react';
@@ -26,7 +25,6 @@ import { Loader2 } from 'lucide-react';
 const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
 
 export default function TaskModal({ open, onOpenChange, task, members, family, defaultDueDate, defaultStatus = 'TODO' }) {
-  const { user } = useAuth();
   const { toast } = useToast();
   const saveTask = useSaveTask();
 
@@ -77,30 +75,29 @@ export default function TaskModal({ open, onOpenChange, task, members, family, d
       toast({ title: 'Title is required', variant: 'destructive' });
       return;
     }
-    const week_start = form.due_date ? getWeekStart(form.due_date) : '';
-    const payload = {
+    // Normalize to what the strict backend schema accepts: optional id/date
+    // fields are null (never '' — a blank string is not a valid uuid/date and
+    // is rejected as 422), and server-derived fields (family_id, owner_id,
+    // created_by_user_id) are NEVER sent. `status` is accepted only on PATCH
+    // (update); on create it defaults to TODO server-side, so it is omitted.
+    const trimmed = form.description.trim();
+    const base = {
       title: form.title.trim(),
-      description: form.description.trim(),
-      assigned_member_id: form.assigned_member_id || '',
-      status: form.status,
+      description: trimmed ? trimmed : null,
+      assigned_member_id: form.assigned_member_id || null,
       priority: form.priority,
       points: Number(form.points) || 0,
-      due_date: form.due_date || '',
-      due_time: form.due_time || '',
-      week_start
+      due_date: form.due_date || null,
+      due_time: form.due_time || null,
+      week_start: form.due_date ? getWeekStart(form.due_date) : null
     };
     try {
       if (task) {
-        await saveTask.mutateAsync({ id: task.id, data: payload });
+        // Update may change status (board column / completion state).
+        await saveTask.mutateAsync({ id: task.id, data: { ...base, status: form.status } });
       } else {
-        await saveTask.mutateAsync({
-          data: {
-            ...payload,
-            family_id: family.id,
-            created_by_user_id: user.id,
-            owner_id: user.id
-          }
-        });
+        // Create: no status, no family_id/owner_id/created_by_user_id.
+        await saveTask.mutateAsync({ data: base });
       }
       onOpenChange(false);
       toast({ title: task ? 'Task updated' : 'Task created' });

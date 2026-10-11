@@ -45,6 +45,18 @@ vi.mock('@/api/client', () => ({
   configureApiClient: vi.fn(),
 }));
 
+// The AuthProvider bootstraps the backend family rows via GET /me as soon as a
+// session exists (the backend creates responsible_user + family only there).
+// Mock the family api so we can assert that bootstrap happens and keep the test
+// off the network.
+const meMock = vi.hoisted(() => vi.fn(async () => ({
+  family: { id: 'fam-1', name: 'My Family', relationship: null, responsible_name: null },
+  responsibleUser: { id: 'resp-1', email: 'parent@example.com', avatar_url: null },
+})));
+vi.mock('@/api/family.api', () => ({
+  family: { me: meMock, get: vi.fn(), update: vi.fn() },
+}));
+
 // Imported after the mocks are registered.
 import { supabase } from '@/lib/supabaseClient';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
@@ -68,6 +80,7 @@ const AUTHENTICATED_SESSION = {
 };
 
 beforeEach(() => {
+  meMock.mockClear();
   mockState.currentSession = null;
   signInWithOAuth.mockClear();
   signOut.mockClear();
@@ -153,6 +166,36 @@ describe('ProtectedRoute gating (R1.8 / R24.5)', () => {
     expect(
       screen.queryByRole('button', { name: /continue with google/i }),
     ).not.toBeInTheDocument();
+  });
+
+  it('bootstraps the backend family via GET /me once a session exists', async () => {
+    // Regression: PATCH /family returned 404 because the frontend never called
+    // GET /me, so the backend never created the responsible_user + family rows.
+    // The AuthProvider must bootstrap /me when authenticated.
+    setSession(AUTHENTICATED_SESSION);
+    render(
+      <AuthProvider>
+        <MemoryRouter initialEntries={['/']}>
+          <Protected />
+        </MemoryRouter>
+      </AuthProvider>,
+    );
+
+    await waitFor(() => expect(meMock).toHaveBeenCalled());
+  });
+
+  it('does NOT call GET /me when there is no session', async () => {
+    setSession(null);
+    render(
+      <AuthProvider>
+        <MemoryRouter initialEntries={['/']}>
+          <Protected />
+        </MemoryRouter>
+      </AuthProvider>,
+    );
+
+    await screen.findByRole('button', { name: /continue with google/i });
+    expect(meMock).not.toHaveBeenCalled();
   });
 
   it('exposes the authenticated user from the restored session', async () => {

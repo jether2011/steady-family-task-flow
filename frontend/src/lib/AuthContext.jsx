@@ -1,6 +1,7 @@
 import React, { createContext, useState, useContext, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { configureApiClient } from '@/api/client';
+import { family as familyApi } from '@/api/family.api';
 
 // AuthContext — reworked for Supabase Google OAuth (DP-3 / R1.8 / R24.5 / R24.6).
 //
@@ -57,11 +58,37 @@ export const AuthProvider = ({ children }) => {
 
   // Guard so we only wire the REST client once per provider instance.
   const configuredRef = useRef(false);
+  // Tracks the auth user id we've already bootstrapped (GET /me) so repeated
+  // onAuthStateChange emissions (token refresh, tab focus) don't re-run it.
+  const bootstrappedUserRef = useRef(null);
 
-  const applySession = useCallback((session) => {
+  const applySession = useCallback(async (session) => {
     const mapped = mapSessionUser(session);
     setUser(mapped);
     setIsAuthenticated(!!session);
+
+    // CRITICAL: the backend creates the responsible_user + family rows ONLY on
+    // the first GET /me after login. Nothing else does. Until that runs, every
+    // GET/PATCH /family returns 404 (NOT_FOUND), which breaks onboarding. So we
+    // bootstrap here as soon as we have a session, and only mark auth "checked"
+    // (which releases ProtectedRoute to render the app) once it has completed —
+    // this guarantees the family exists before any page fires GET /family.
+    if (session?.user) {
+      if (bootstrappedUserRef.current !== session.user.id) {
+        try {
+          await familyApi.me();
+          bootstrappedUserRef.current = session.user.id;
+        } catch (error) {
+          // Don't hard-block the UI on a transient bootstrap failure; log it and
+          // let the app proceed (the onboarding/family calls will surface a
+          // meaningful error if the backend is truly unreachable).
+          console.error('[AuthContext] /me bootstrap failed:', error);
+        }
+      }
+    } else {
+      bootstrappedUserRef.current = null;
+    }
+
     setIsLoadingAuth(false);
     setAuthChecked(true);
   }, []);
