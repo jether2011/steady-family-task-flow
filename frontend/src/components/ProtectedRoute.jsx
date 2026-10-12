@@ -1,3 +1,5 @@
+import { Navigate, useLocation } from 'react-router-dom';
+import { loginPath, accessDestination } from '@/lib/authReturnTo';
 import { Outlet } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 export default function ProtectedRoute({
@@ -10,39 +12,43 @@ export default function ProtectedRoute({
     authChecked,
     access,
     authError,
-    retryAccessResolution,
     logout,
   } = useAuth();
-  if (isLoadingAuth || !authChecked) return fallback;
-  if (!isAuthenticated) return unauthenticatedElement;
-  if (authError)
+  const location = useLocation();
+  if (authError && isAuthenticated)
+    return <Navigate replace to="/access-error" />;
+  if (isLoadingAuth || (!authChecked && !authError)) return fallback;
+  if (!isAuthenticated)
     return (
-      <AccessNotice
-        title="Could not resolve family access"
-        detail={authError.message}
-      >
-        <button onClick={retryAccessResolution}>Retry</button>
-        <button onClick={logout}>Sign out</button>
-      </AccessNotice>
+      unauthenticatedElement ?? (
+        <Navigate replace to={loginPath(location.pathname + location.search)} />
+      )
     );
-  if (!access || ['NO_ACCESS', 'REVOKED'].includes(access.state))
+  if (
+    !access ||
+    ['NO_ACCESS', 'REVOKED', 'PAYMENT_REQUIRED'].includes(access.state)
+  )
+    return <Navigate replace to={accessDestination(access)} />;
+  if (
+    access.membership?.role === 'MEMBER' &&
+    accessDestination(access, location.pathname + location.search) !==
+      location.pathname + location.search
+  )
     return (
-      <AccessNotice
-        title={
-          access?.state === 'REVOKED'
-            ? 'Family access revoked'
-            : 'No family access'
-        }
-        detail="Ask your family manager to enable access for your verified email."
-      >
-        <button onClick={logout}>Sign out</button>
-      </AccessNotice>
+      <Navigate
+        replace
+        to={accessDestination(access, location.pathname + location.search)}
+      />
     );
   if (access.membership?.role === 'MEMBER')
     return (
       <AccessNotice
         title="Family access connected"
-        detail="Your member dashboard will be available with the member experience feature."
+        detail={
+          new URLSearchParams(location.search).get('accessMessage') === 'member'
+            ? 'Your role does not allow that page. You were returned to home. Your member dashboard will be available with the member experience feature.'
+            : 'Your member dashboard will be available with the member experience feature.'
+        }
       >
         <button onClick={logout}>Sign out</button>
       </AccessNotice>

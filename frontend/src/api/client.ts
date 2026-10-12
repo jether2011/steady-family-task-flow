@@ -8,8 +8,8 @@
  *  - Parse the backend Error_Contract (`{ error: { code, message } }`) on any
  *    non-2xx response and throw a typed `ApiError { code, message, status }`.
  *  - Serialize query params (dropping null/undefined) for list/filter endpoints.
- *  - On a `401`, invoke the configured `onUnauthorized()` (redirect to Google
- *    OAuth login) and still throw `ApiError` so callers can react (R24.5).
+ *  - On a `401`, invoke the configured `onUnauthorized()` (return to neutral
+ *    login) and still throw `ApiError` so callers can react (R24.5).
  *
  * ---------------------------------------------------------------------------
  * INJECTABLE AUTH CONTRACT (for task 16.1 — AuthContext Supabase rework)
@@ -89,8 +89,9 @@ export class ApiError extends Error {
 export interface ApiClientConfig {
   /** Return the current Supabase access token, or null when signed out. */
   getAccessToken: () => string | null | Promise<string | null>;
-  /** Redirect to the Google OAuth login flow (invoked on a 401). */
+  /** Return to neutral login choices (invoked on a 401). */
   onUnauthorized: () => void;
+  onAccessRevoked?: () => void;
 }
 
 let config: ApiClientConfig | null = null;
@@ -222,11 +223,18 @@ export async function request<T>(
 
   if (!res.ok) {
     const err = await parseErrorContract(res);
-    if (res.status === 401) {
+    const currentScope =
+      !signal?.aborted &&
+      (res.status === 401 ||
+        (res.status === 403 && err.code === 'ACCESS_REVOKED')) &&
+      (await resolveAccessToken()) === token;
+    if (res.status === 401 && currentScope) {
       // Session expired / missing: redirect to login, then still throw so the
       // caller (and TanStack Query) sees the failure (R24.5).
       config?.onUnauthorized();
     }
+    if (currentScope && res.status === 403 && err.code === 'ACCESS_REVOKED')
+      config?.onAccessRevoked?.();
     throw err;
   }
 

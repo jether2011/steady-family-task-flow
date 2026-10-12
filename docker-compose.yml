@@ -52,6 +52,8 @@ services:
       # VITE_* are build-time (R29.7); interpolated from env, baked into bundle.
       # Only public values — the secret key is never passed here (R29.4).
       args:
+        VITE_EMAIL_OTP_ENABLED: ${VITE_EMAIL_OTP_ENABLED:-false}
+        VITE_AUTH_CAPTCHA_SITE_KEY: ${VITE_AUTH_CAPTCHA_SITE_KEY:-}
         VITE_API_URL: ${VITE_API_URL}
         VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
         VITE_SUPABASE_PUBLISHABLE_KEY: ${VITE_SUPABASE_PUBLISHABLE_KEY}

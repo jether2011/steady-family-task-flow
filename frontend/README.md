@@ -1,6 +1,6 @@
 # Family Task Board - Frontend
 
-A React 18 single-page app (Vite + Tailwind + TanStack Query) for the Family Task Board. It authenticates users with Supabase Google OAuth, reads and writes through the typed REST client in `src/api/`, and subscribes to Supabase Realtime for live board updates. Highlights: a drag-friendly weekly board, a points leaderboard, award redemption, member profiles, onboarding, and a landscape "Wall Mode" for a mounted display.
+A React 18 single-page app (Vite + Tailwind + TanStack Query) for the Family Task Board. It authenticates users with Google or optional Supabase email OTP, reads and writes through the typed REST client in `src/api/`, and refreshes authorized data through polling. Highlights: a drag-friendly weekly board, a points leaderboard, award redemption, member profiles, onboarding, and a landscape "Wall Mode" for a mounted display.
 
 > Migration note: this app originally used the Base44 SDK. The data layer was swapped to a typed REST client that talks to this project's backend; the UI stays in `.jsx`. There is no Base44 dependency anymore.
 
@@ -8,13 +8,13 @@ A React 18 single-page app (Vite + Tailwind + TanStack Query) for the Family Tas
 
 - React 18, Vite, Tailwind CSS v3 (pinned; v4 moved its PostCSS plugin), Radix UI
 - TanStack Query for data fetching/caching
-- `@supabase/supabase-js` for auth + realtime
+- `@supabase/supabase-js` for provider authentication
 - Typed REST client in `src/api/` (`.ts`)
 - Vitest + React Testing Library for tests
 
 ## User flow
 
-1. The app is gated by `ProtectedRoute`: while the Supabase session resolves it shows a loader, and with no session it renders the single "Continue with Google" login screen.
+1. The app is gated by `ProtectedRoute`: while the Supabase session resolves it shows a loader, and with no session it redirects to `/login` with validated local returnTo. Google and optional email code choices are available there.
 2. On login, `AuthContext` calls `GET /api/v1/me` before rendering family pages to resolve role and access. Resolution never creates a family; unknown and revoked accounts see a dedicated access notice. Resolution repeats on focus and every 30 seconds, clearing cached family data when scope changes.
 3. `Layout` sends the user to `/onboarding` until the family is configured (helper `isFamilyConfigured` in `src/lib/familyUtils.js`: both `relationship` and `responsible_name` set). Onboarding submits name + your name + role via `PATCH /family`, then routes to the dashboard. There is no "load sample data" option — the flow is fully manual.
 4. From there: Members (CRUD), Board/Dashboard (create, assign, move, complete tasks), Leaderboard, Awards (create + redeem), Templates, History, and Wall Mode.
@@ -159,3 +159,9 @@ From the repo root, `docker compose up -d --build` builds and runs the backend a
 - Env change had no effect: `VITE_*` are compile-time - rebuild/redeploy after changing them.
 - No family access after login: inspect `/me`; NO_ACCESS requires a provisioned verified mailbox, REVOKED requires manager action. New tenant creation is planned in specification 04.
 - Create fails with `422 VALIDATION`: the request includes a server-derived field (`family_id`, `owner_id`, `active`, a task's `status`) or an empty string where a uuid/date is expected. Send only user-authored fields; use `null` for empty optionals.
+
+## Email OTP login
+
+Google remains available. Enable `VITE_EMAIL_OTP_ENABLED=true` after configuring Supabase email templates, custom SMTP, six-digit codes and provider-side abuse controls. `VITE_AUTH_CAPTCHA_SITE_KEY` optionally enables the Cloudflare Turnstile widget; its secret belongs in Supabase. These settings are build-time values.
+
+`/login` handles both methods. Protected URLs preserve a validated local destination; no-access, revoked and resolution-error routes provide retry/change-account actions. Logout and API 401 return to neutral login. See the [rollout and recovery guide](../docs/implementation/02-email-otp-rollout.md).

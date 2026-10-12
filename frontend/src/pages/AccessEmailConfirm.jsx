@@ -3,7 +3,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { supabase } from '@/lib/supabaseClient';
 import { post } from '@/api/client';
 export default function AccessEmailConfirm() {
-  const { user, login, retryAccessResolution } = useAuth();
+  const { user, loginWithGoogle, retryAccessResolution } = useAuth();
   const [token] = useState(
     () => new URLSearchParams(window.location.search).get('token') ?? '',
   );
@@ -49,7 +49,15 @@ export default function AccessEmailConfirm() {
         family access.
       </p>
       {!user ? (
-        <button onClick={login}>Sign in to your existing account</button>
+        <button
+          onClick={() =>
+            loginWithGoogle().catch(() =>
+              setMessage('Could not start sign-in. Please try again.'),
+            )
+          }
+        >
+          Sign in to your existing account
+        </button>
       ) : (
         <>
           <label htmlFor="new-email">New email</label>

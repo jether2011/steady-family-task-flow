@@ -5,6 +5,7 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom';
 const state = vi.hoisted(() => ({ value: {} }));
 vi.mock('@/lib/AuthContext', () => ({ useAuth: () => state.value }));
 import ProtectedRoute from './ProtectedRoute';
+import AccessStatus from '@/pages/AccessStatus';
 beforeEach(() => {
   state.value = {
     isAuthenticated: true,
@@ -15,12 +16,16 @@ beforeEach(() => {
     retryAccessResolution: vi.fn(),
   };
 });
-function view() {
+function view(path = '/') {
   render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[path]}>
       <Routes>
+        {['/no-access', '/access-revoked', '/access-error'].map((path) => (
+          <Route key={path} path={path} element={<AccessStatus />} />
+        ))}
         <Route element={<ProtectedRoute />}>
           <Route path="/" element={<div>Management dashboard</div>} />
+          <Route path="/settings" element={<div>Settings</div>} />
         </Route>
       </Routes>
     </MemoryRouter>,
@@ -38,6 +43,14 @@ describe('access boundary', () => {
     expect(screen.getByText('Family access connected')).toBeInTheDocument();
     expect(screen.queryByText('Management dashboard')).not.toBeInTheDocument();
   });
+  it('returns a member management link to home with an access message', () => {
+    state.value.access.membership.role = 'MEMBER';
+    view('/settings');
+    expect(
+      screen.getByText(/Your role does not allow that page/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Settings')).not.toBeInTheDocument();
+  });
   it.each([
     ['NO_ACCESS', 'No family access'],
     ['REVOKED', 'Family access revoked'],
@@ -50,7 +63,7 @@ describe('access boundary', () => {
   it('clears content and exposes retry on resolution error', () => {
     state.value.authError = { message: 'Unavailable' };
     view();
-    expect(screen.getByText('Retry')).toBeInTheDocument();
+    expect(screen.getByText('Retry access')).toBeInTheDocument();
     expect(screen.queryByText('Management dashboard')).not.toBeInTheDocument();
   });
   it('requires owner to complete onboarding', () => {

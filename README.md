@@ -7,9 +7,9 @@ The project is split into two independently deployable apps:
 | App | Stack | What it does |
 | --- | --- | --- |
 | `backend/` | Node 20 - Fastify 5 - TypeScript - Supabase (PostgreSQL) | REST API, atomic points ledger, auth verification, OpenAPI docs |
-| `frontend/` | React 18 - Vite - Tailwind - TanStack Query | SPA UI, Supabase Google OAuth, real-time board, Wall Mode |
+| `frontend/` | React 18 - Vite - Tailwind - TanStack Query | SPA UI, Google and optional email OTP, family board, Wall Mode |
 
-Both talk to a hosted Supabase project, which provides the PostgreSQL database, authentication (Google OAuth), row-level security, and real-time subscriptions.
+Both talk to a hosted Supabase project, which provides the PostgreSQL database, authentication (Google and optional email OTP), and row-level security.
 
 ---
 
@@ -36,9 +36,9 @@ Browser ->|   frontend   | ------------------> |   backend    |
 
 ## User flow
 
-The app models ONE responsible adult per family; everyone else is a member record (no login) that the responsible manages.
+Each family has one Owner and optional Manager/Member logins. Login access is separate from participant type.
 
-1. Sign in with Google (the only auth method).
+1. Sign in through `/login` with Google or, when enabled, an email code.
 2. On the first authenticated load, the frontend calls `GET /api/v1/me`, which resolves the verified account to an existing family membership and its OWNER, MANAGER, or MEMBER role. It never creates a family. Unknown accounts see NO_ACCESS; tenant creation is planned in specification 04.
 3. Onboarding. A freshly-created family is "unconfigured" (its `relationship` and `responsible_name` are still empty). The app routes the user to `/onboarding` until they submit the family name, their display name, and their role (`PATCH /api/v1/family`). After that the family counts as configured and the app opens.
 4. Add members (name, type, color, optional birth year).
@@ -184,3 +184,5 @@ Deploy order that avoids a chicken-and-egg problem:
 See LICENSE.
 
 Membership access setup and rollout: [implementation guide](docs/implementation/01-membership-rollout.md).
+
+Email OTP login setup: [specification 02 rollout guide](docs/implementation/02-email-otp-rollout.md).
