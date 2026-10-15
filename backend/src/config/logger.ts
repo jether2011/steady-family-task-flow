@@ -37,6 +37,12 @@ import { env, type Env } from './env.js';
  */
 const REDACT_PATHS: readonly string[] = [
   // --- Authorization headers (Bearer JWTs) in every place they can appear ---
+  'req.headers["stripe-signature"]',
+  'headers["stripe-signature"]',
+  'STRIPE_SECRET_KEY',
+  'STRIPE_WEBHOOK_SECRET',
+  '*.STRIPE_SECRET_KEY',
+  '*.STRIPE_WEBHOOK_SECRET',
   'authorization',
   'Authorization',
   'headers.authorization',
@@ -148,6 +154,7 @@ export function buildLoggerOptions(targetEnv: Env): LoggerOptions {
         const headers: Record<string, unknown> = { ...rawHeaders };
         if ('authorization' in headers) headers.authorization = '[Redacted]';
         if ('Authorization' in headers) headers.Authorization = '[Redacted]';
+        if ('stripe-signature' in headers) headers['stripe-signature'] = '[Redacted]';
         if ('cookie' in headers) headers.cookie = '[Redacted]';
 
         return {

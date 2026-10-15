@@ -53,6 +53,8 @@ import { authRoutes } from './modules/auth/auth.routes.js';
 // `src/modules/family/family.routes.ts` (task 5.1) registers `GET`/`PATCH
 // /api/v1/family`: the composed family DTO read and the two-table atomic update
 // (R2.1–R2.4).
+import { billingRoutes } from './modules/billing/billing.routes.js';
+import { billingWebhook } from './modules/billing/billing.webhook.js';
 import { tenantRoutes } from './modules/tenant/tenant.routes.js';
 import { familyRoutes } from './modules/family/family.routes.js';
 // `src/modules/members/member.routes.ts` (task 5.2) registers the members CRUD +
@@ -169,6 +171,7 @@ export function buildApp(): FastifyInstance {
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   };
   void app.register(cors, corsOptions);
+  void app.register(billingWebhook);
 
   // OpenAPI docs (task 12.1). Registered BEFORE routes so the dynamic swagger
   // generator captures every subsequently-registered `/api/v1` route — request
@@ -240,6 +243,7 @@ function registerRoutes(app: FastifyInstance): void {
       // `responsible_users` atomically (R2.1–R2.4).
       familyRoutes(apiV1);
       tenantRoutes(apiV1);
+      billingRoutes(apiV1);
 
       // Members: `GET`/`POST /api/v1/family/members` and
       // `PATCH`/`DELETE /api/v1/family/members/:id` (task 5.2). CRUD with soft

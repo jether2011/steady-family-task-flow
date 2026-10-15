@@ -72,6 +72,10 @@ export default function Layout() {
   const { logout, access } = useAuth();
 
   const member = access?.membership?.role === 'MEMBER';
+  const ownerNav =
+    access?.membership?.role === 'OWNER'
+      ? [...navItems, { to: '/billing', label: 'Billing', icon: Settings }]
+      : navItems;
   const visibleNav = member
     ? navItems
         .filter(
@@ -79,7 +83,7 @@ export default function Layout() {
             !['/members', '/settings', '/task-templates'].includes(item.to),
         )
         .concat({ to: '/member-profile', label: 'My profile', icon: Users })
-    : navItems;
+    : ownerNav;
   if (isLoading) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-background">

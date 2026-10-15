@@ -132,3 +132,56 @@ describe('parseEnv — malformed values', () => {
     );
   });
 });
+
+describe('billing configuration gates', () => {
+  it('leaves purchase disabled with no invented price or member limit', () => {
+    const env = parseEnv(validSource());
+    expect(env.CHECKOUT_ENABLED).toBe(false);
+    expect(env.STRIPE_MODE).toBe('TEST');
+    expect(env.STRIPE_PRICE_ID).toBeUndefined();
+    expect(env.BILLING_MEMBER_LIMIT).toBeUndefined();
+  });
+  it('rejects enablement without approved merchant/plan/legal settings', () => {
+    expect(() =>
+      parseEnv(
+        validSource({ BILLING_AVAILABLE: 'true', CHECKOUT_ENABLED: 'true' }),
+      ),
+    ).toThrow(/missing.*STRIPE_SECRET_KEY/);
+  });
+  it('does not expose a mismatched live secret', () => {
+    const secret = 'sk_live_do-not-log-this';
+    let message = '';
+    try {
+      parseEnv(validSource({ STRIPE_MODE: 'TEST', STRIPE_SECRET_KEY: secret }));
+    } catch (error) {
+      message = (error as Error).message;
+    }
+    expect(message).toContain('STRIPE_SECRET_KEY');
+    expect(message).not.toContain(secret);
+  });
+  it('rejects unsafe configured return origins and unsupported payment methods', () => {
+    expect(() =>
+      parseEnv(
+        validSource({
+          PUBLIC_APP_URL: 'https://app.example.test/redirect?next=evil',
+        }),
+      ),
+    ).toThrow(/PUBLIC_APP_URL/);
+    expect(() =>
+      parseEnv(
+        validSource({ BILLING_PAYMENT_METHODS: 'card,us_bank_account' }),
+      ),
+    ).toThrow(/BILLING_PAYMENT_METHODS/);
+  });
+  it('accepts blank optional docker settings without enabling purchase', () => {
+    expect(
+      parseEnv(
+        validSource({
+          BILLING_EVENT_RETENTION_DAYS: '',
+          STRIPE_SECRET_KEY: '',
+          STRIPE_WEBHOOK_SECRET: '',
+        }),
+      ).CHECKOUT_ENABLED,
+    ).toBe(false);
+  });
+});

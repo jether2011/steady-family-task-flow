@@ -24,7 +24,46 @@ import { z } from 'zod';
  *   endpoint from `SUPABASE_URL` (`${SUPABASE_URL}/auth/v1/.well-known/jwks.json`).
  *   Set it only to point verification at a non-default JWKS location.
  */
+const optionalBillingString = z.preprocess(
+  (v) => (v === '' ? undefined : v),
+  z.string().min(1).optional(),
+);
 const envSchema = z.object({
+  CHECKOUT_ENABLED: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((v) => v === 'true'),
+  STRIPE_MODE: z.enum(['TEST', 'LIVE']).default('TEST'),
+  STRIPE_SECRET_KEY: optionalBillingString,
+  STRIPE_WEBHOOK_SECRET: optionalBillingString,
+  STRIPE_ACCOUNT_ID: optionalBillingString,
+  STRIPE_MERCHANT_COUNTRY: optionalBillingString,
+  STRIPE_PRICE_ID: optionalBillingString,
+  STRIPE_PORTAL_CONFIGURATION_ID: optionalBillingString,
+  BILLING_PLAN_TITLE: optionalBillingString,
+  BILLING_PLAN_FEATURES: optionalBillingString,
+  BILLING_MEMBER_LIMIT: optionalBillingString,
+  BILLING_CURRENCY: optionalBillingString,
+  BILLING_TAX_BEHAVIOR: z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z.enum(['inclusive', 'exclusive']).optional(),
+  ),
+  BILLING_AUTOMATIC_TAX: z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z.enum(['true', 'false']).optional(),
+  ),
+  BILLING_PAYMENT_METHODS: optionalBillingString,
+  BILLING_TERMS_URL: optionalBillingString,
+  BILLING_PRIVACY_URL: optionalBillingString,
+  BILLING_POLICY_URL: optionalBillingString,
+  BILLING_TAX_DISCLOSURE: optionalBillingString,
+  BILLING_APPROVAL_REFERENCE: optionalBillingString,
+  BILLING_EVENT_RETENTION_DAYS: z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z.coerce.number().int().min(1).max(365).optional(),
+  ),
+  BILLING_MAX_RETRIES: z.coerce.number().int().min(1).max(30).default(10),
+
   SELF_SERVICE_SIGNUP_ENABLED: z
     .enum(['true', 'false'])
     .default('false')
@@ -77,6 +116,8 @@ export type Env = z.infer<typeof envSchema> & {
 const SECRET_KEYS = new Set([
   'SUPABASE_PUBLISHABLE_KEY',
   'SUPABASE_SECRET_KEY',
+  'STRIPE_SECRET_KEY',
+  'STRIPE_WEBHOOK_SECRET',
 ]);
 
 /**
@@ -106,6 +147,96 @@ export function parseEnv(source: NodeJS.ProcessEnv = process.env): Env {
     throw new Error(formatIssues(result.error));
   }
 
+  const billing = result.data;
+  if (
+    billing.STRIPE_SECRET_KEY &&
+    !billing.STRIPE_SECRET_KEY.startsWith(
+      billing.STRIPE_MODE === 'LIVE' ? 'sk_live_' : 'sk_test_',
+    )
+  )
+    throw new Error(
+      'Invalid environment configuration: STRIPE_SECRET_KEY does not match STRIPE_MODE',
+    );
+  if (billing.CHECKOUT_ENABLED && !billing.BILLING_AVAILABLE)
+    throw new Error(
+      'Invalid environment configuration: CHECKOUT_ENABLED requires BILLING_AVAILABLE',
+    );
+  if (billing.CHECKOUT_ENABLED) {
+    const required = [
+      'STRIPE_SECRET_KEY',
+      'STRIPE_WEBHOOK_SECRET',
+      'STRIPE_ACCOUNT_ID',
+      'STRIPE_MERCHANT_COUNTRY',
+      'STRIPE_PRICE_ID',
+      'STRIPE_PORTAL_CONFIGURATION_ID',
+      'PUBLIC_APP_URL',
+      'BILLING_PLAN_TITLE',
+      'BILLING_PLAN_FEATURES',
+      'BILLING_MEMBER_LIMIT',
+      'BILLING_CURRENCY',
+      'BILLING_TAX_BEHAVIOR',
+      'BILLING_AUTOMATIC_TAX',
+      'BILLING_PAYMENT_METHODS',
+      'BILLING_TERMS_URL',
+      'BILLING_PRIVACY_URL',
+      'BILLING_POLICY_URL',
+      'BILLING_TAX_DISCLOSURE',
+      'BILLING_APPROVAL_REFERENCE',
+      'BILLING_EVENT_RETENTION_DAYS',
+    ] as const;
+    const missing = required.filter((k) => billing[k] === undefined);
+    if (missing.length)
+      throw new Error(
+        'Invalid environment configuration: missing ' + missing.join(', '),
+      );
+  }
+  for (const key of [
+    'PUBLIC_APP_URL',
+    'BILLING_TERMS_URL',
+    'BILLING_PRIVACY_URL',
+    'BILLING_POLICY_URL',
+  ] as const) {
+    const value = billing[key];
+    if (!value) continue;
+    let url: URL;
+    try {
+      url = new URL(value);
+    } catch {
+      throw new Error('Invalid environment configuration: ' + key);
+    }
+    if (
+      url.username ||
+      url.password ||
+      url.search ||
+      url.hash ||
+      (url.protocol !== 'https:' &&
+        !(
+          billing.NODE_ENV !== 'production' &&
+          ['localhost', '127.0.0.1'].includes(url.hostname) &&
+          url.protocol === 'http:'
+        )) ||
+      (key === 'PUBLIC_APP_URL' && url.pathname !== '/')
+    )
+      throw new Error(
+        'Invalid environment configuration: ' +
+          key +
+          ' must be an approved HTTPS URL',
+      );
+  }
+  if (
+    billing.BILLING_MEMBER_LIMIT &&
+    billing.BILLING_MEMBER_LIMIT !== 'unlimited' &&
+    (!/^[1-9][0-9]*$/.test(billing.BILLING_MEMBER_LIMIT) ||
+      !Number.isSafeInteger(Number(billing.BILLING_MEMBER_LIMIT)))
+  )
+    throw new Error('Invalid environment configuration: BILLING_MEMBER_LIMIT');
+  if (
+    billing.BILLING_PAYMENT_METHODS &&
+    billing.BILLING_PAYMENT_METHODS !== 'card'
+  )
+    throw new Error(
+      'Invalid environment configuration: BILLING_PAYMENT_METHODS currently supports approved card-only automatic collection',
+    );
   const corsOrigins = result.data.CORS_ORIGIN.split(',')
     .map((origin) => origin.trim())
     .filter((origin) => origin.length > 0);

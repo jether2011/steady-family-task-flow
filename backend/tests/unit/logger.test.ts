@@ -140,3 +140,13 @@ describe('buildLoggerOptions — redaction policy (R26.1)', () => {
     expect(serialized).not.toContain('abc123');
   });
 });
+
+it('redacts Stripe secrets and signed webhook headers', () => {
+  const paths = redactPaths();
+  for (const key of [
+    'STRIPE_SECRET_KEY',
+    'STRIPE_WEBHOOK_SECRET',
+    'req.headers["stripe-signature"]',
+  ])
+    expect(paths).toContain(key);
+});

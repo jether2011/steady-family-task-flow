@@ -1,6 +1,6 @@
 # Specification 5: Stripe subscriptions
 
-Date: 2026-10-11 · Status: Design draft · Branch: `codex/stripe-subscriptions`
+Date: 2026-10-11 · Status: Implementation delivered; TEST-account and specification 6 release acceptance pending · Branch: `codex/stripe-subscriptions`
 
 Depends on [roles](01-tenant-membership-roles.md), [explicit onboarding](04-saas-tenant-onboarding.md), and approved merchant/plan settings. Source: [PRD](../product/PRD-family-access-and-saas.md); [shared conventions](README.md).
 
@@ -120,3 +120,5 @@ Monitor durable inbox age (alert when >60 seconds in healthy operation), failure
 Completion requires approved plan/merchant settings, provider-version and test-mode evidence, both app checks, DB concurrency tests, worker/restart runbook and specification 6 integration. Unresolved refund/dispute policies prevent live enablement, not documentation completion.
 
 Traceability: BILL-01–10, TEN-05; AUTH-08 identity preservation; prerequisite facts for lifecycle enforcement.
+
+Implementation, environment abstraction, worker operations and remaining staging acceptance: [specification 05 rollout guide](../implementation/05-stripe-billing-rollout.md).

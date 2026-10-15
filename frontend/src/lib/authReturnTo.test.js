@@ -13,12 +13,15 @@ describe('auth destinations', () => {
     '/%2Fevil.test',
     '/\\evil.test',
     '/login',
-    '/subscribe',
     '/unknown',
     '/%00',
     '/board%5cother',
   ])('rejects unsafe destination %s', (value) =>
     expect(safeReturnTo(value)).toBe('/'),
+  );
+  it.each(['/subscribe', '/billing', '/billing/return?attempt=opaque'])(
+    'retains owner billing routes for later authorization: %s',
+    (value) => expect(safeReturnTo(value)).toBe(value),
   );
   it('retains known local routes and filters', () =>
     expect(safeReturnTo('/board?week=2026-10-12')).toBe(
