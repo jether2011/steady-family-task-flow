@@ -23,7 +23,13 @@ vi.mock('../../src/config/supabase.js', () => ({
       select: () => ({
         eq: () => ({
           single: async () => ({
-            data: { responsible_user_id: 'owner' },
+            data: {
+              responsible_user_id: 'owner',
+              lifecycle: 'ESTABLISHED',
+              creation_source: 'LEGACY',
+              legacy_access_eligible: true,
+              profile_completed_at: '2026-10-01T00:00:00Z',
+            },
             error: null,
           }),
         }),

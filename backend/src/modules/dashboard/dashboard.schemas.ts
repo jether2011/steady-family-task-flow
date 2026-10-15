@@ -42,9 +42,15 @@ import { FamilyDTOSchema } from '../family/family.schemas.js';
  */
 export const BoardQuery = z
   .object({
-    weekStart: z.string().refine(isValidIsoDate, {
-      message: 'weekStart must be a valid ISO YYYY-MM-DD date',
-    }),
+    weekStart: z
+      .string()
+      .refine(isValidIsoDate, {
+        message: 'weekStart must be a valid ISO YYYY-MM-DD date',
+      })
+      .refine(
+        (value) => new Date(value + 'T00:00:00Z').getUTCDay() === 1,
+        'weekStart must be Monday',
+      ),
   })
   .strict();
 

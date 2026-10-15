@@ -1,20 +1,21 @@
+import { useLeaderboard } from '@/hooks/useMemberViews';
+import { useScope } from '@/hooks/useScope';
+import ReadState from '@/components/member/ReadState';
+import { useDirectory } from '@/hooks/useMemberViews';
 import React, { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
   useFamily,
   useMembers,
   useTasks,
-  usePoints,
   useCompleteTask,
-  useReopenTask
+  useReopenTask,
 } from '@/hooks/useFamily';
 import { useRealtime } from '@/hooks/useRealtime';
 import {
-  todayKey,
   computeProgress,
-  computeLeaderboard,
   PRIORITY_LABELS,
-  PRIORITY_STYLES
+  PRIORITY_STYLES,
 } from '@/lib/familyUtils';
 import MemberAvatar from '@/components/family/MemberAvatar';
 import ProgressBar from '@/components/common/ProgressBar';
@@ -23,15 +24,21 @@ import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
 
 function errMsg(e) {
-  return e?.response?.data?.error?.message || e?.message || 'Something went wrong';
+  return (
+    e?.response?.data?.error?.message || e?.message || 'Something went wrong'
+  );
 }
 
 export default function Wall() {
-  const today = todayKey();
+  const scope = useScope();
+  return scope.role === 'MEMBER' ? <MemberWall /> : <ManagementWall />;
+}
+function ManagementWall() {
+  const today = new Date().toISOString().slice(0, 10);
   const { data: family } = useFamily();
   const { data: members } = useMembers(true);
   const { data: tasks } = useTasks({ dueDate: today });
-  const { data: transactions } = usePoints();
+  const { data: ranking } = useLeaderboard('week');
   const completeTask = useCompleteTask();
   const reopenTask = useReopenTask();
   const { toast } = useToast();
@@ -40,16 +47,60 @@ export default function Wall() {
   // low-frequency fallback refresh when the channel is unhealthy (R19.5 / R21).
   useRealtime(family?.id);
 
+  return (
+    <WallView
+      family={family}
+      members={members}
+      tasks={tasks}
+      ranking={ranking}
+      completeTask={completeTask}
+      reopenTask={reopenTask}
+      toast={toast}
+    />
+  );
+}
+function MemberWall() {
+  const scope = useScope(),
+    directory = useDirectory(),
+    taskQuery = useTasks({ dueDate: new Date().toISOString().slice(0, 10) }),
+    ranking = useLeaderboard('week');
+  return (
+    <ReadState query={directory} label="member directory">
+      <ReadState query={taskQuery} label="wall tasks">
+        <WallView
+          readOnly
+          family={scope.access?.family}
+          members={directory.data}
+          tasks={taskQuery.data}
+          ranking={ranking.data}
+        />
+        <ReadState query={ranking} label="wall leaderboard" />
+      </ReadState>
+    </ReadState>
+  );
+}
+function WallView({
+  family,
+  members,
+  tasks,
+  ranking,
+  completeTask,
+  reopenTask,
+  toast,
+  readOnly = false,
+}) {
+  const leaderboard = ranking?.entries ?? [];
   const memberMap = useMemo(
     () => Object.fromEntries((members || []).map((m) => [m.id, m])),
-    [members]
+    [members],
   );
   const progress = computeProgress(tasks || []);
-  const leaderboard = computeLeaderboard(transactions, members, 'week');
 
   const tasksByMember = useMemo(() => {
     const map = {};
-    (members || []).forEach((m) => { map[m.id] = []; });
+    (members || []).forEach((m) => {
+      map[m.id] = [];
+    });
     (tasks || []).forEach((t) => {
       if (t.assigned_member_id && map[t.assigned_member_id]) {
         map[t.assigned_member_id].push(t);
@@ -61,16 +112,20 @@ export default function Wall() {
   const handleComplete = async (task) => {
     if (!task.assigned_member_id) return;
     try {
-      await completeTask.mutateAsync({ taskId: task.id, completedByMemberId: task.assigned_member_id });
+      await completeTask.mutateAsync({
+        taskId: task.id,
+        completedByMemberId: task.assigned_member_id,
+      });
     } catch (e) {
       toast({ title: errMsg(e), variant: 'destructive' });
     }
   };
 
   const dateStr = new Date().toLocaleDateString('en-US', {
+    timeZone: 'UTC',
     weekday: 'long',
     month: 'long',
-    day: 'numeric'
+    day: 'numeric',
   });
 
   return (
@@ -85,18 +140,30 @@ export default function Wall() {
             <span className="text-primary-foreground font-bold text-lg">F</span>
           </div>
           <div>
-            <h1 className="font-heading font-bold text-xl leading-none">{family?.name || 'FamTask'}</h1>
-            <p className="text-xs text-muted-foreground mt-1">{dateStr}</p>
+            <h1 className="font-heading font-bold text-xl leading-none">
+              {family?.name || 'FamTask'}
+            </h1>
+            <p className="text-xs text-muted-foreground mt-1">
+              {dateStr} · Today (UTC){readOnly ? ' · view only' : ''}
+            </p>
           </div>
         </div>
 
         <div className="flex items-center gap-6">
           <div className="text-center">
-            <p className="font-heading font-bold text-2xl text-primary">{progress.percentage}%</p>
-            <p className="text-[11px] text-muted-foreground">{progress.completed}/{progress.total} done</p>
+            <p className="font-heading font-bold text-2xl text-primary">
+              {progress.percentage}%
+            </p>
+            <p className="text-[11px] text-muted-foreground">
+              {progress.completed}/{progress.total} done
+            </p>
           </div>
           <div className="hidden md:block w-40">
-            <ProgressBar value={progress.completed} max={progress.total || 1} className="h-2.5" />
+            <ProgressBar
+              value={progress.completed}
+              max={progress.total || 1}
+              className="h-2.5"
+            />
           </div>
           <Link
             to="/"
@@ -114,7 +181,9 @@ export default function Wall() {
           <div className="flex gap-4 h-full min-w-min">
             {(members || []).map((m) => {
               const memberTasks = tasksByMember[m.id] || [];
-              const doneCount = memberTasks.filter((t) => t.status === 'DONE').length;
+              const doneCount = memberTasks.filter(
+                (t) => t.status === 'DONE',
+              ).length;
               return (
                 <div
                   key={m.id}
@@ -123,7 +192,9 @@ export default function Wall() {
                   <div className="flex items-center gap-2.5 p-4 border-b border-border">
                     <MemberAvatar member={m} size="md" />
                     <div className="flex-1 min-w-0">
-                      <h2 className="font-heading font-semibold text-base truncate">{m.name}</h2>
+                      <h2 className="font-heading font-semibold text-base truncate">
+                        {m.name}
+                      </h2>
                       <p className="text-xs text-muted-foreground">
                         {doneCount}/{memberTasks.length} done
                       </p>
@@ -131,7 +202,9 @@ export default function Wall() {
                   </div>
                   <div className="flex-1 overflow-y-auto scrollbar-thin p-3 space-y-3">
                     {memberTasks.length === 0 ? (
-                      <div className="text-center text-xs text-muted-foreground py-8">No tasks today</div>
+                      <div className="text-center text-xs text-muted-foreground py-8">
+                        No tasks today
+                      </div>
                     ) : (
                       memberTasks.map((task) => {
                         const done = task.status === 'DONE';
@@ -140,11 +213,18 @@ export default function Wall() {
                             key={task.id}
                             className={cn(
                               'rounded-2xl border p-3.5 transition-all',
-                              done ? 'bg-success/10 border-success/30' : 'bg-card border-border'
+                              done
+                                ? 'bg-success/10 border-success/30'
+                                : 'bg-card border-border',
                             )}
                           >
                             <div className="flex items-start justify-between gap-2 mb-2">
-                              <span className={cn('text-[10px] font-bold uppercase px-1.5 py-0.5 rounded', PRIORITY_STYLES[task.priority])}>
+                              <span
+                                className={cn(
+                                  'text-[10px] font-bold uppercase px-1.5 py-0.5 rounded',
+                                  PRIORITY_STYLES[task.priority],
+                                )}
+                              >
                                 {PRIORITY_LABELS[task.priority]}
                               </span>
                               <span className="inline-flex items-center gap-0.5 text-warning font-bold text-sm">
@@ -152,7 +232,12 @@ export default function Wall() {
                                 {task.points}
                               </span>
                             </div>
-                            <p className={cn('font-semibold text-sm leading-snug mb-3', done && 'line-through text-muted-foreground')}>
+                            <p
+                              className={cn(
+                                'font-semibold text-sm leading-snug mb-3',
+                                done && 'line-through text-muted-foreground',
+                              )}
+                            >
                               {task.title}
                             </p>
                             {task.due_time && (
@@ -160,14 +245,23 @@ export default function Wall() {
                                 <Clock className="w-3 h-3" /> {task.due_time}
                               </p>
                             )}
-                            {done ? (
+                            {readOnly ? (
+                              <p className="text-sm font-semibold">
+                                {done ? 'Done' : 'Assigned work'}
+                              </p>
+                            ) : done ? (
                               <button
                                 type="button"
-                                onClick={() => reopenTask.mutate({ taskId: task.id })}
+                                onClick={() =>
+                                  reopenTask.mutate({ taskId: task.id })
+                                }
                                 aria-label={`Reopen ${task.title}`}
                                 className="w-full min-h-11 min-w-11 h-12 rounded-xl bg-success/15 text-success font-semibold text-sm flex items-center justify-center gap-2 hover:bg-success/25 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                               >
-                                <RotateCcw className="w-5 h-5" aria-hidden="true" />
+                                <RotateCcw
+                                  className="w-5 h-5"
+                                  aria-hidden="true"
+                                />
                                 Done
                               </button>
                             ) : (
@@ -197,15 +291,32 @@ export default function Wall() {
           <div className="border-t border-border bg-card/60 backdrop-blur-sm px-5 py-3">
             <div className="flex items-center gap-2 mb-2">
               <Trophy className="w-4 h-4 text-warning" />
-              <h3 className="font-heading font-semibold text-sm">This week's leaders</h3>
+              <h3 className="font-heading font-semibold text-sm">
+                Last 7 days
+              </h3>
             </div>
             <div className="flex gap-3 overflow-x-auto no-scrollbar">
               {leaderboard.slice(0, 6).map((e, i) => (
-                <div key={e.memberId} className="flex items-center gap-2 shrink-0 rounded-full bg-muted/60 px-3 py-1.5">
-                  <span className={cn('font-bold text-xs', i === 0 ? 'text-warning' : 'text-muted-foreground')}>{i + 1}</span>
-                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: e.color }} />
+                <div
+                  key={e.memberId}
+                  className="flex items-center gap-2 shrink-0 rounded-full bg-muted/60 px-3 py-1.5"
+                >
+                  <span
+                    className={cn(
+                      'font-bold text-xs',
+                      i === 0 ? 'text-warning' : 'text-muted-foreground',
+                    )}
+                  >
+                    {e.rank ?? i + 1}
+                  </span>
+                  <span
+                    className="w-2 h-2 rounded-full"
+                    style={{ backgroundColor: e.color }}
+                  />
                   <span className="text-sm font-medium">{e.name}</span>
-                  <span className="text-sm font-bold text-warning">{e.points}</span>
+                  <span className="text-sm font-bold text-warning">
+                    {e.points}
+                  </span>
                 </div>
               ))}
             </div>

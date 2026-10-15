@@ -1,3 +1,20 @@
+vi.mock('@/hooks/useScope', () => ({
+  useScope: () => ({
+    prefix: ['scope', 'test-user', 'test-family', 'OWNER', 1],
+    key: (...parts) => [
+      'scope',
+      'test-user',
+      'test-family',
+      'OWNER',
+      1,
+      ...parts,
+    ],
+    enabled: true,
+    role: 'OWNER',
+    canManage: true,
+    memberId: null,
+  }),
+}));
 import React from 'react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { act, renderHook } from '@testing-library/react';

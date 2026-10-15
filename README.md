@@ -70,7 +70,7 @@ Everything the apps need in code is in this repo, but a Supabase project must be
    - publishable key (`sb_publishable_...`) -> `SUPABASE_PUBLISHABLE_KEY` / `VITE_SUPABASE_PUBLISHABLE_KEY` (safe to expose to the browser; replaces the legacy anon key)
    - secret key (`sb_secret_...`) -> `SUPABASE_SECRET_KEY` (secret - backend only, never ship to the browser or commit it; replaces the legacy service_role key)
 3. Enable Google OAuth. Go to Authentication -> Providers -> Google, toggle it on, and paste a Google OAuth Client ID and Client Secret (created in the [Google Cloud Console](https://console.cloud.google.com/) under APIs & Services -> Credentials -> OAuth client ID -> Web application). In the Google credential, add Supabase's callback URL (`https://<your-project-ref>.supabase.co/auth/v1/callback`) as an authorized redirect URI. In Authentication -> URL Configuration, set the Site URL to your frontend origin (e.g. `http://localhost:5173` for local dev).
-4. Apply the database schema. Run the SQL migrations and seed in order. The simplest path is the dashboard SQL Editor: open each file under `backend/src/supabase/migrations/` in numeric order (001 -> 007) and run it, then optionally run `backend/src/supabase/seed.sql` for demo data. The backend README also shows how to apply them with psql or the Supabase CLI.
+4. Apply the database schema. Run the SQL migrations and seed in order. The simplest path is the dashboard SQL Editor: open each file under `backend/src/supabase/migrations/` in numeric order (001 -> 009) and run it, then optionally run `backend/src/supabase/seed.sql` for demo data. The backend README also shows how to apply them with psql or the Supabase CLI.
 
 > Why this is manual: creating the project, flipping the Google provider on, and supplying Google's OAuth credentials are account/console/third-party actions. The migrations, API, and auth wiring are all already in code.
 
@@ -163,7 +163,7 @@ Deploy order that avoids a chicken-and-egg problem:
 |  |  +- modules/        # auth, family, members, tasks, completions, templates, gamification, dashboard, ops
 |  |  +- middleware/     # auth, context, authorization, error handling
 |  |  +- config/         # env, supabase clients, logger, docs
-|  |  +- supabase/       # SQL migrations 001-007 + seed.sql
+|  |  +- supabase/       # SQL migrations 001-009 + seed.sql
 |  +- Dockerfile
 +- frontend/             # React SPA (data-layer migrated off Base44 to a typed REST client)
 |  +- src/
@@ -186,3 +186,7 @@ See LICENSE.
 Membership access setup and rollout: [implementation guide](docs/implementation/01-membership-rollout.md).
 
 Email OTP login setup: [specification 02 rollout guide](docs/implementation/02-email-otp-rollout.md).
+
+Member dashboard and history setup: [specification 03 rollout guide](docs/implementation/03-member-dashboard-rollout.md).
+
+Explicit SaaS drafts and legacy compatibility: [specification 04 rollout guide](docs/implementation/04-tenant-onboarding-rollout.md). Signup stays disabled until checkout and entitlement enforcement ship.

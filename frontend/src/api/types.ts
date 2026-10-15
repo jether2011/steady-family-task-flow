@@ -55,7 +55,7 @@ export interface ResponsibleUser {
   avatar_url: string | null;
 }
 
-/** `GET /me` payload: profile + family (family created on first login). */
+/** `GET /me` payload: resolved identity and existing membership. */
 export interface AccessSummary {
   membershipId: string;
   email: string | null;
@@ -64,6 +64,7 @@ export interface AccessSummary {
   accessVersion: number;
 }
 export type MePayload = {
+  signupAvailable?: boolean;
   user: { id: string; displayName: string | null; avatarUrl: string | null };
   capabilities: string[];
 } & (
@@ -106,7 +107,7 @@ export interface Task {
   title: string;
   description: string | null;
   assigned_member_id: string | null;
-  created_by_user_id: string | null;
+  created_by_user_id?: string | null;
   created_by_app_user_id?: string;
   status: TaskStatus;
   priority: Priority;
@@ -153,10 +154,12 @@ export interface PointsTransaction {
 
 /** A record that a member completed a task. */
 export interface TaskCompletion {
+  task_title?: string | null;
+  awarded_points?: number;
   id: string;
   task_id: string;
   family_id: string;
-  completed_by_user_id: string;
+  completed_by_user_id?: string | null;
   completed_by_member_id: string;
   completed_at: string;
 }
@@ -181,6 +184,8 @@ export interface Award {
 
 /** One row of the leaderboard. */
 export interface LeaderboardEntry {
+  avatarUrl: string | null;
+  rank: number;
   memberId: string;
   name: string;
   color: string | null;
@@ -190,6 +195,9 @@ export interface LeaderboardEntry {
 
 /** `GET /family/leaderboard` payload. */
 export interface LeaderboardPayload {
+  period: LeaderboardPeriod;
+  from: string | null;
+  asOf: string;
   entries: LeaderboardEntry[];
 }
 
@@ -214,6 +222,7 @@ export interface BoardPayload {
 
 /** `GET /family/members/:id/completions` member-profile payload. */
 export interface MemberProfilePayload {
+  nextCursor: string | null;
   completions: TaskCompletion[];
   transactions: PointsTransaction[];
 }

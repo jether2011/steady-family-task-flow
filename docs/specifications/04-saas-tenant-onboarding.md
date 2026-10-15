@@ -1,6 +1,6 @@
 # Specification 4: Explicit SaaS tenant onboarding
 
-Date: 2026-10-11 · Status: Design draft · Branch: `codex/saas-tenant-onboarding`
+Date: 2026-10-11 · Status: Implemented; rollout disabled pending specifications 5/6 · Branch: `codex/saas-tenant-onboarding`
 
 Depends on [membership foundation](01-tenant-membership-roles.md); email login improves signup but is not required to implement this branch. Source: [PRD](../product/PRD-family-access-and-saas.md); [shared conventions](README.md).
 
@@ -96,3 +96,5 @@ Ship lifecycle schema and disabled UI first. Enable self-service only after spec
 Monitor create conflict rate, partial creation alarms, draft resume success and onboarding-to-checkout funnel. Completion requires real DB concurrency/constraint tests, frontend onboarding tests, both builds/typechecks, migration rehearsal and reviewed single-tenant policy. Paid signup remains deliberately disabled until its commercial dependencies are resolved.
 
 Traceability: TEN-01–06, AUTH-07/09; BILL-03/04 foundation. Subscription activation is owned by specifications 5/6.
+
+Implementation and release instructions: [specification 04 rollout guide](../implementation/04-tenant-onboarding-rollout.md).

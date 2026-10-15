@@ -241,6 +241,8 @@ describe('ops probes + OpenAPI docs (R26.2–R26.4, R27.1)', () => {
       expect(paths.some((p) => p.startsWith('/api/v1/'))).toBe(true);
       // Beyond the probes, the family-scoped business routes are present too.
       expect(paths).toContain('/api/v1/family');
+      expect(paths).toContain('/api/v1/families');
+      expect(paths).toContain('/api/v1/family/onboarding');
     });
 
     it('serves the OpenAPI JSON over HTTP under the docs prefix', async () => {
@@ -253,5 +255,21 @@ describe('ops probes + OpenAPI docs (R26.2–R26.4, R27.1)', () => {
       expect(paths).toContain('/api/v1/health');
       expect(paths.some((p) => p.startsWith('/api/v1/'))).toBe(true);
     });
+  });
+  it('permits the idempotency header in browser preflight', async () => {
+    const res = await app.inject({
+      method: 'OPTIONS',
+      url: '/api/v1/families',
+      headers: {
+        origin: 'https://app.example.com',
+        'access-control-request-method': 'POST',
+        'access-control-request-headers':
+          'authorization,content-type,idempotency-key',
+      },
+    });
+    expect(res.statusCode).toBe(204);
+    expect(
+      res.headers['access-control-allow-headers']?.toLowerCase(),
+    ).toContain('idempotency-key');
   });
 });

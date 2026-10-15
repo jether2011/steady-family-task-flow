@@ -1,4 +1,10 @@
-import { resolveMembership } from '../access/access.service.js';
+import { tenantState } from '../tenant/tenant.policy.js';
+import { env } from '../../config/env.js';
+import { accessRpc } from '../access/access.repository.js';
+import {
+  resolveMembership,
+  verifiedIdentity,
+} from '../access/access.service.js';
 import { loadFamilyAndResponsible } from '../family/family.repository.js';
 import type { AuthClaims } from '../../middleware/types.js';
 import type { MePayload } from '../../shared/types/index.js';
@@ -13,20 +19,31 @@ export async function bootstrapMe(
     avatarUrl: resolved.user.avatar_url,
   };
   const m = resolved.membership;
-  if (!m)
+  if (!m) {
+    const signupAvailable =
+      resolved.state !== 'REVOKED' &&
+      env.SELF_SERVICE_SIGNUP_ENABLED &&
+      (await accessRpc<boolean>('tenant_signup_eligible', {
+        p_auth: authUserId,
+        p_email: (await verifiedIdentity(authUserId)).email,
+      }));
     return {
       state: resolved.state === 'REVOKED' ? 'REVOKED' : 'NO_ACCESS',
       user,
       family: null,
       membership: null,
       capabilities: [],
+      signupAvailable,
     };
+  }
   const { data: household, error } = await (
     await import('../../config/supabase.js')
   )
     .getServiceRoleClient()
     .from('families')
-    .select('responsible_user_id')
+    .select(
+      'responsible_user_id,lifecycle,creation_source,legacy_access_eligible,profile_completed_at',
+    )
     .eq('id', m.family_id)
     .single();
   if (error) throw error;
@@ -34,11 +51,9 @@ export async function bootstrapMe(
     m.family_id,
     household.responsible_user_id,
   );
+  const state = tenantState(household);
   return {
-    state:
-      responsible.name && responsible.relationship
-        ? 'READY'
-        : 'ONBOARDING_REQUIRED',
+    state,
     user,
     family: {
       id: family.id,
@@ -54,23 +69,28 @@ export async function bootstrapMe(
       accessVersion: m.access_version,
     },
     capabilities:
-      m.role === 'MEMBER'
-        ? [
-            'family:read',
-            'board:read',
-            'points:self',
-            'leaderboard:read',
-            'awards:read',
-          ]
-        : [
-            'family:read',
-            'family:manage',
-            'members:manage',
-            'tasks:manage',
-            'templates:manage',
-            'points:all',
-            'awards:manage',
-            ...(m.role === 'OWNER' ? ['owner:onboarding'] : []),
-          ],
+      state !== 'READY'
+        ? m.role === 'OWNER'
+          ? ['owner:onboarding']
+          : []
+        : m.role === 'MEMBER'
+          ? [
+              ...(env.MEMBER_VIEWS_ENABLED ? ['member:views'] : []),
+              'family:read',
+              'board:read',
+              'points:self',
+              'leaderboard:read',
+              'awards:read',
+            ]
+          : [
+              'family:read',
+              'family:manage',
+              'members:manage',
+              'tasks:manage',
+              'templates:manage',
+              'points:all',
+              'awards:manage',
+              ...(m.role === 'OWNER' ? ['owner:onboarding'] : []),
+            ],
   };
 }

@@ -37,6 +37,7 @@ describe('membership resolution replaces implicit family bootstrap', () => {
               family: null,
               membership: null,
               capabilities: [],
+              signupAvailable: false,
             });
         },
       ),
@@ -66,7 +67,13 @@ describe('membership resolution replaces implicit family bootstrap', () => {
       },
     });
     mocks.single.mockResolvedValue({
-      data: { responsible_user_id: 'owner' },
+      data: {
+        responsible_user_id: 'owner',
+        lifecycle: 'ESTABLISHED',
+        creation_source: 'LEGACY',
+        legacy_access_eligible: true,
+        profile_completed_at: '2026-10-01T00:00:00Z',
+      },
       error: null,
     });
     mocks.load.mockResolvedValue({
@@ -78,4 +85,53 @@ describe('membership resolution replaces implicit family bootstrap', () => {
     expect(me.capabilities).not.toContain('family:manage');
     expect(me.family?.id).toBe('family');
   });
+});
+
+describe('tenant bootstrap lifecycle', () => {
+  it.each([
+    ['DRAFT', 'SELF_SERVICE', false, null, 'ONBOARDING_REQUIRED'],
+    ['DRAFT', 'SELF_SERVICE', false, '2026-10-01', 'PAYMENT_REQUIRED'],
+    ['ESTABLISHED', 'SELF_SERVICE', false, '2026-10-01', 'PAYMENT_REQUIRED'],
+    ['ESTABLISHED', 'LEGACY', false, '2026-10-01', 'PAYMENT_REQUIRED'],
+    ['ESTABLISHED', 'LEGACY', true, '2026-10-01', 'READY'],
+  ] as const)(
+    'routes %s %s eligible=%s profile=%s to %s',
+    async (
+      lifecycle,
+      creation_source,
+      legacy_access_eligible,
+      profile_completed_at,
+      expected,
+    ) => {
+      mocks.resolve.mockResolvedValue({
+        state: 'READY',
+        user: { id: 'app', display_name: null, avatar_url: null },
+        membership: {
+          id: 'm',
+          family_id: 'family',
+          role: 'OWNER',
+          member_id: null,
+          access_version: 1,
+        },
+      });
+      mocks.single.mockResolvedValue({
+        data: {
+          responsible_user_id: 'owner',
+          lifecycle,
+          creation_source,
+          legacy_access_eligible,
+          profile_completed_at,
+        },
+        error: null,
+      });
+      mocks.load.mockResolvedValue({
+        family: { id: 'family', name: 'Family', avatar_url: null },
+        responsible: { name: 'Owner', relationship: 'OTHER' },
+      });
+      const result = await bootstrapMe('auth', {});
+      expect(result.state).toBe(expected);
+      if (expected !== 'READY')
+        expect(result.capabilities).toEqual(['owner:onboarding']);
+    },
+  );
 });

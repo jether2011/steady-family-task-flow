@@ -1,3 +1,5 @@
+import { useScope } from '@/hooks/useScope';
+import MemberBoard from './MemberBoard';
 import React, { useState, useMemo } from 'react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import {
@@ -7,7 +9,7 @@ import {
   useMoveTask,
   useCompleteTask,
   useReopenTask,
-  useGenerateRecurring
+  useGenerateRecurring,
 } from '@/hooks/useFamily';
 import { STATUS_ORDER, getWeekStart } from '@/lib/familyUtils';
 import TaskCard from '@/components/tasks/TaskCard';
@@ -25,14 +27,20 @@ const ACCENTS = {
   BACKLOG: 'bg-muted-foreground/40',
   TODO: 'bg-primary',
   WORKING: 'bg-info',
-  DONE: 'bg-success'
+  DONE: 'bg-success',
 };
 
 function errMsg(e) {
-  return e?.response?.data?.error?.message || e?.message || 'Something went wrong';
+  return (
+    e?.response?.data?.error?.message || e?.message || 'Something went wrong'
+  );
 }
 
 export default function Board() {
+  const scope = useScope();
+  return scope.role === 'MEMBER' ? <MemberBoard /> : <ManagementBoard />;
+}
+function ManagementBoard() {
   const { data: family } = useFamily();
   const { data: members } = useMembers(true);
   const [weekStart, setWeekStart] = useState(getWeekStart());
@@ -51,7 +59,7 @@ export default function Board() {
 
   const memberMap = useMemo(
     () => Object.fromEntries((members || []).map((m) => [m.id, m])),
-    [members]
+    [members],
   );
 
   const tasksByStatus = useMemo(() => {
@@ -75,14 +83,23 @@ export default function Board() {
     try {
       if (destStatus === 'DONE' && task.status !== 'DONE') {
         if (!task.assigned_member_id) {
-          toast({ title: 'Assign this task to a member first', variant: 'destructive' });
+          toast({
+            title: 'Assign this task to a member first',
+            variant: 'destructive',
+          });
           return;
         }
-        await completeTask.mutateAsync({ taskId, completedByMemberId: task.assigned_member_id });
+        await completeTask.mutateAsync({
+          taskId,
+          completedByMemberId: task.assigned_member_id,
+        });
       } else if (sourceStatus === 'DONE' && destStatus !== 'DONE') {
         await reopenTask.mutateAsync({ taskId });
       } else {
-        await moveTask.mutateAsync({ id: taskId, data: { status: destStatus } });
+        await moveTask.mutateAsync({
+          id: taskId,
+          data: { status: destStatus },
+        });
       }
     } catch (e) {
       toast({ title: errMsg(e), variant: 'destructive' });
@@ -93,7 +110,10 @@ export default function Board() {
     try {
       const res = await generateRecurring.mutateAsync({ weekStart });
       toast({
-        title: res.created > 0 ? `${res.created} recurring task${res.created === 1 ? '' : 's'} generated` : 'No new recurring tasks for this week'
+        title:
+          res.created > 0
+            ? `${res.created} recurring task${res.created === 1 ? '' : 's'} generated`
+            : 'No new recurring tasks for this week',
       });
     } catch (e) {
       toast({ title: errMsg(e), variant: 'destructive' });
@@ -104,16 +124,35 @@ export default function Board() {
     <div className="p-4 lg:p-6 animate-fade-in h-full flex flex-col">
       <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
         <div>
-          <h1 className="font-heading font-bold text-2xl lg:text-3xl">Weekly board</h1>
-          <p className="text-sm text-muted-foreground mt-1">Drag tasks between columns</p>
+          <h1 className="font-heading font-bold text-2xl lg:text-3xl">
+            Weekly board
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Drag tasks between columns
+          </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <WeekSelector weekStart={weekStart} onChange={setWeekStart} />
-          <Button variant="outline" size="sm" onClick={handleGenerate} disabled={generateRecurring.isPending}>
-            {generateRecurring.isPending ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Repeat className="w-4 h-4 mr-1" />}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleGenerate}
+            disabled={generateRecurring.isPending}
+          >
+            {generateRecurring.isPending ? (
+              <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+            ) : (
+              <Repeat className="w-4 h-4 mr-1" />
+            )}
             Generate
           </Button>
-          <Button size="sm" onClick={() => { setEditTask(null); setModalOpen(true); }}>
+          <Button
+            size="sm"
+            onClick={() => {
+              setEditTask(null);
+              setModalOpen(true);
+            }}
+          >
             <Plus className="w-4 h-4 mr-1" />
             Task
           </Button>
@@ -131,11 +170,20 @@ export default function Board() {
           description="Add a task, or generate recurring tasks from your templates."
           action={
             <div className="flex gap-2 justify-center">
-              <Button variant="outline" onClick={handleGenerate} disabled={generateRecurring.isPending}>
+              <Button
+                variant="outline"
+                onClick={handleGenerate}
+                disabled={generateRecurring.isPending}
+              >
                 <Repeat className="w-4 h-4 mr-1" />
                 Generate recurring
               </Button>
-              <Button onClick={() => { setEditTask(null); setModalOpen(true); }}>
+              <Button
+                onClick={() => {
+                  setEditTask(null);
+                  setModalOpen(true);
+                }}
+              >
                 <Plus className="w-4 h-4 mr-1" />
                 Add task
               </Button>
@@ -148,34 +196,56 @@ export default function Board() {
             {STATUS_ORDER.map((status) => (
               <Droppable key={status} droppableId={status}>
                 {(provided) => (
-                  <div ref={provided.innerRef} {...provided.droppableProps} className="h-full">
+                  <div
+                    ref={provided.innerRef}
+                    {...provided.droppableProps}
+                    className="h-full"
+                  >
                     <BoardColumn
                       status={status}
                       tasks={tasksByStatus[status]}
                       accentClass={ACCENTS[status]}
                     >
                       {tasksByStatus[status].map((task, index) => (
-                        <Draggable key={task.id} draggableId={task.id} index={index}>
+                        <Draggable
+                          key={task.id}
+                          draggableId={task.id}
+                          index={index}
+                        >
                           {(p, snapshot) => (
                             <div
                               ref={p.innerRef}
                               {...p.draggableProps}
                               {...p.dragHandleProps}
                               style={p.draggableProps.style}
-                              className={cn(snapshot.isDragging && 'rotate-2 shadow-lg')}
+                              className={cn(
+                                snapshot.isDragging && 'rotate-2 shadow-lg',
+                              )}
                             >
                               <TaskCard
                                 task={task}
                                 member={memberMap[task.assigned_member_id]}
                                 onComplete={(t) => {
                                   if (!t.assigned_member_id) {
-                                    toast({ title: 'Assign this task to a member first', variant: 'destructive' });
+                                    toast({
+                                      title:
+                                        'Assign this task to a member first',
+                                      variant: 'destructive',
+                                    });
                                     return;
                                   }
-                                  completeTask.mutate({ taskId: t.id, completedByMemberId: t.assigned_member_id });
+                                  completeTask.mutate({
+                                    taskId: t.id,
+                                    completedByMemberId: t.assigned_member_id,
+                                  });
                                 }}
-                                onReopen={(t) => reopenTask.mutate({ taskId: t.id })}
-                                onEdit={(t) => { setEditTask(t); setModalOpen(true); }}
+                                onReopen={(t) =>
+                                  reopenTask.mutate({ taskId: t.id })
+                                }
+                                onEdit={(t) => {
+                                  setEditTask(t);
+                                  setModalOpen(true);
+                                }}
                               />
                             </div>
                           )}

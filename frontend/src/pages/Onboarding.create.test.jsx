@@ -4,134 +4,142 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
-
-// Onboarding behavior after the flow rework:
-//  - Google OAuth lands here; the family row already exists (auto-created by
-//    /me) but is UNCONFIGURED (relationship/responsible_name null).
-//  - "Create family" (PATCH /family via useCreateFamily) fills the profile and
-//    navigates to "/".
-//  - A failure shows a meaningful toast.
-//  - The "Load sample family" option was removed.
-//  - If the family is ALREADY configured, onboarding redirects to "/".
-
 const h = vi.hoisted(() => ({
+  create: vi.fn(),
+  load: vi.fn(),
+  update: vi.fn(),
   navigate: vi.fn(),
-  createFamilyMutateAsync: vi.fn(),
-  createFamilyPending: false,
-  family: { id: 'fam-1', name: 'My Family', relationship: null, responsible_name: null },
-  familyLoading: false,
-  user: { full_name: 'Jether', email: 'jether@example.com' },
-  toast: vi.fn(),
+  retry: vi.fn(),
+  access: null,
 }));
-
-vi.mock('react-router-dom', async (orig) => {
-  const actual = await orig();
-  return { ...actual, useNavigate: () => h.navigate };
-});
-
-vi.mock('@/hooks/useFamily', () => ({
-  useFamily: () => ({ data: h.family, isLoading: h.familyLoading }),
-  useCreateFamily: () => ({
-    mutateAsync: h.createFamilyMutateAsync,
-    isPending: h.createFamilyPending,
-  }),
+vi.mock('@/api/family.api', () => ({
+  family: { create: h.create, onboarding: h.load, updateOnboarding: h.update },
 }));
-
+vi.mock('react-router-dom', async (orig) => ({
+  ...(await orig()),
+  useNavigate: () => h.navigate,
+}));
 vi.mock('@/lib/AuthContext', () => ({
-  useAuth: () => ({ user: h.user }),
+  useAuth: () => ({
+    isAuthenticated: true,
+    authChecked: true,
+    access: h.access,
+    retryAccessResolution: h.retry,
+  }),
+  useOptionalAuth: () => ({ access: h.access, authChecked: true }),
 }));
-
-vi.mock('@/components/ui/use-toast', () => ({
-  useToast: () => ({ toast: h.toast }),
-  toast: h.toast,
-}));
-
-import Onboarding from '@/pages/Onboarding';
-
-function renderOnboarding() {
-  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  qc.refetchQueries = vi.fn().mockResolvedValue(undefined);
-  qc.invalidateQueries = vi.fn().mockResolvedValue(undefined);
+import Onboarding from './Onboarding';
+const profile = {
+  name: 'Existing Family',
+  responsible_name: 'Owner',
+  relationship: 'OTHER',
+};
+function show(creating = true) {
   return render(
-    <QueryClientProvider client={qc}>
+    <QueryClientProvider
+      client={
+        new QueryClient({ defaultOptions: { queries: { retry: false } } })
+      }
+    >
       <MemoryRouter>
-        <Onboarding />
+        <Onboarding creating={creating} />
       </MemoryRouter>
     </QueryClientProvider>,
   );
 }
-
 beforeEach(() => {
   vi.clearAllMocks();
-  h.family = { id: 'fam-1', name: 'My Family', relationship: null, responsible_name: null };
-  h.familyLoading = false;
-  h.createFamilyPending = false;
-  h.user = { full_name: 'Jether', email: 'jether@example.com' };
+  h.access = {
+    state: 'NO_ACCESS',
+    signupAvailable: true,
+    user: { id: 'app', displayName: 'Tester' },
+    family: null,
+    membership: null,
+  };
+  h.retry.mockResolvedValue(undefined);
+  h.create.mockResolvedValue({ nextAction: 'SUBSCRIBE' });
+  h.load.mockResolvedValue({ family: profile, nextAction: 'COMPLETE_PROFILE' });
 });
-
-describe('Onboarding — Create family', () => {
-  it('prefills "Your name" from the Google profile', async () => {
-    renderOnboarding();
+async function submit() {
+  const user = userEvent.setup();
+  await user.type(screen.getByLabelText('Family name'), 'New family');
+  await user.click(screen.getByRole('button', { name: 'Create family' }));
+}
+describe('explicit tenant onboarding', () => {
+  it('prefills editable identity text and redirects completed creation to subscription, never dashboard', async () => {
+    show();
+    expect(screen.getByLabelText('Your name')).toHaveValue('Tester');
+    expect(
+      screen.getByLabelText('Relationship to the family'),
+    ).toBeInTheDocument();
+    await submit();
     await waitFor(() =>
-      expect(screen.getByLabelText(/your name/i)).toHaveValue('Jether'),
+      expect(h.navigate).toHaveBeenCalledWith('/subscribe', { replace: true }),
     );
+    expect(h.create).toHaveBeenCalledWith(
+      {
+        name: 'New family',
+        responsible_name: 'Tester',
+        relationship: 'FATHER',
+      },
+      expect.stringMatching(/^[a-f0-9-]{36}$/),
+    );
+    expect(h.retry).toHaveBeenCalled();
+    expect(h.update).not.toHaveBeenCalled();
   });
-
-  it('submits the flat body and navigates to "/" on success', async () => {
-    h.createFamilyMutateAsync.mockResolvedValue({ id: 'fam-1' });
-    const user = userEvent.setup();
-    renderOnboarding();
-
-    const famInput = screen.getByLabelText(/family name/i);
-    await user.clear(famInput);
-    await user.type(famInput, 'Rodrigues Family');
-    await user.click(screen.getByRole('button', { name: /create family/i }));
-
-    await waitFor(() => expect(h.createFamilyMutateAsync).toHaveBeenCalledTimes(1));
-    expect(h.createFamilyMutateAsync).toHaveBeenCalledWith({
-      name: 'Rodrigues Family',
-      responsible_name: 'Jether',
-      relationship: 'FATHER',
-    });
+  it('keeps the same idempotency key across a lost response and retry', async () => {
+    h.create.mockRejectedValueOnce(new Error('Connection lost'));
+    show();
+    await submit();
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Connection lost',
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Create family' }),
+    );
+    await waitFor(() => expect(h.create).toHaveBeenCalledTimes(2));
+    expect(h.create.mock.calls[0]).toEqual(h.create.mock.calls[1]);
+  });
+  it('resumes an existing legacy draft via onboarding PATCH and follows its server action', async () => {
+    h.access = {
+      ...h.access,
+      state: 'ONBOARDING_REQUIRED',
+      family: { id: 'family' },
+      membership: { role: 'OWNER' },
+    };
+    h.update.mockResolvedValue({ nextAction: 'OPEN_DASHBOARD' });
+    show(false);
+    expect(await screen.findByLabelText('Family name')).toHaveValue(
+      'Existing Family',
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Save profile' }));
     await waitFor(() =>
       expect(h.navigate).toHaveBeenCalledWith('/', { replace: true }),
     );
+    expect(h.update).toHaveBeenCalledWith(profile);
+    expect(h.create).not.toHaveBeenCalled();
   });
-
-  it('surfaces the API error message in a toast on failure (meaningful, not blank)', async () => {
-    h.createFamilyMutateAsync.mockRejectedValue(
-      new Error('Cannot reach the server at http://localhost:8080/api/v1. Is the backend running and is VITE_API_URL correct?'),
-    );
-    const user = userEvent.setup();
-    renderOnboarding();
-
-    const famInput = screen.getByLabelText(/family name/i);
-    await user.clear(famInput);
-    await user.type(famInput, 'Rodrigues Family');
-    await user.click(screen.getByRole('button', { name: /create family/i }));
-
-    await waitFor(() => expect(h.toast).toHaveBeenCalled());
-    const arg = h.toast.mock.calls.at(-1)[0];
-    expect(arg.variant).toBe('destructive');
-    expect(arg.description).toContain('Cannot reach the server');
-    expect(h.navigate).not.toHaveBeenCalled();
+  it('does not present creation when the server disables signup', () => {
+    h.access.signupAvailable = false;
+    show();
+    expect(
+      screen.queryByRole('button', { name: 'Create family' }),
+    ).not.toBeInTheDocument();
+    expect(h.create).not.toHaveBeenCalled();
   });
-
-  it('does NOT offer a "Load sample family" option', () => {
-    renderOnboarding();
-    expect(screen.queryByRole('button', { name: /sample/i })).not.toBeInTheDocument();
-  });
-
-  it('redirects to "/" when the family is already configured', () => {
-    h.family = {
-      id: 'fam-1',
-      name: 'Rodrigues Family',
-      relationship: 'FATHER',
-      responsible_name: 'Jether',
+  it('shows load failure and retry instead of submitting a new tenant', async () => {
+    h.access = {
+      ...h.access,
+      state: 'ONBOARDING_REQUIRED',
+      membership: { role: 'OWNER' },
+      family: { id: 'family' },
     };
-    renderOnboarding();
-    // Navigate (react-router) renders nothing visible; assert the setup form is
-    // not shown (the configured-family short-circuit returned <Navigate/>).
-    expect(screen.queryByRole('button', { name: /create family/i })).not.toBeInTheDocument();
+    h.load.mockRejectedValue(new Error('Unavailable'));
+    show(false);
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Could not load family profile',
+    );
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+    expect(h.create).not.toHaveBeenCalled();
   });
 });

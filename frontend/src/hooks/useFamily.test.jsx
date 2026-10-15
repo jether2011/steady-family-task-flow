@@ -1,3 +1,20 @@
+vi.mock('@/hooks/useScope', () => ({
+  useScope: () => ({
+    prefix: ['scope', 'test-user', 'test-family', 'OWNER', 1],
+    key: (...parts) => [
+      'scope',
+      'test-user',
+      'test-family',
+      'OWNER',
+      1,
+      ...parts,
+    ],
+    enabled: true,
+    role: 'OWNER',
+    canManage: true,
+    memberId: null,
+  }),
+}));
 import React from 'react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
@@ -10,7 +27,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 // test suite covers "task completion with error rollback").
 //
 // We mock the tasks API module so `tasks.complete` resolves/rejects a deferred
-// promise we control, letting us inspect the ['tasks'] cache during the
+// promise we control, letting us inspect the ['scope','test-user','test-family','OWNER',1,'tasks'] cache during the
 // optimistic window (before the server responds). We mock the toast dispatcher
 // so we can assert the error toast fires on rollback.
 // ---------------------------------------------------------------------------
@@ -44,7 +61,7 @@ import { tasks } from '@/api/tasks.api';
 import { toast } from '@/components/ui/use-toast';
 import { useCompleteTask } from '@/hooks/useFamily';
 
-const TASKS_KEY = ['tasks'];
+const TASKS_KEY = ['scope', 'test-user', 'test-family', 'OWNER', 1, 'tasks'];
 
 function makeTask(overrides = {}) {
   return {
@@ -57,7 +74,7 @@ function makeTask(overrides = {}) {
 }
 
 /**
- * Build a QueryClient seeded with an initial ['tasks'] list and a wrapper that
+ * Build a QueryClient seeded with an initial ['scope','test-user','test-family','OWNER',1,'tasks'] list and a wrapper that
  * provides it. Retries are disabled so a rejected mutation surfaces its error
  * immediately rather than being retried.
  */
@@ -196,6 +213,26 @@ describe('useCompleteTask — optimistic completion + rollback (R22)', () => {
     expect(result.current.data.points.awarded).toBe(10);
   });
 
+  it('does not recreate a removed manager cache after late mutation failure', async () => {
+    const { queryClient, wrapper } = setup([
+      makeTask({ id: 'task-1', status: 'TODO' }),
+    ]);
+    const { result } = renderHook(() => useCompleteTask(), { wrapper });
+    act(() =>
+      result.current.mutate({ taskId: 'task-1', completedByMemberId: 'm-1' }),
+    );
+    await waitFor(() => expect(mockState.completeDeferred).not.toBeNull());
+    queryClient.clear();
+    await act(async () => {
+      mockState.completeDeferred.reject(new Error('Access revoked'));
+      try {
+        await mockState.completeDeferred.promise;
+      } catch {}
+    });
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(queryClient.getQueryData(TASKS_KEY)).toBeUndefined();
+  });
+
   it('invalidates both ["tasks"] and ["points"] on settle (R22.3 reconciliation)', async () => {
     const initial = [makeTask({ id: 'task-1', status: 'TODO' })];
     const { queryClient, wrapper } = setup(initial);
@@ -227,7 +264,9 @@ describe('useCompleteTask — optimistic completion + rollback (R22)', () => {
     const invalidatedKeys = invalidateSpy.mock.calls.map(
       ([arg]) => arg?.queryKey?.[0],
     );
-    expect(invalidatedKeys).toContain('tasks');
-    expect(invalidatedKeys).toContain('points');
+    expect(invalidatedKeys).toContain('scope');
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ['scope', 'test-user', 'test-family', 'OWNER', 1],
+    });
   });
 });

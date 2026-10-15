@@ -1,3 +1,6 @@
+vi.mock('@/hooks/useMemberViews', () => ({
+  useLeaderboard: () => ({ data: { entries: [] } }),
+}));
 /// <reference types="@testing-library/jest-dom" />
 import React from 'react';
 import { readFileSync } from 'node:fs';

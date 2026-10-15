@@ -1,3 +1,20 @@
+vi.mock('@/hooks/useScope', () => ({
+  useScope: () => ({
+    prefix: ['scope', 'test-user', 'test-family', 'OWNER', 1],
+    key: (...parts) => [
+      'scope',
+      'test-user',
+      'test-family',
+      'OWNER',
+      1,
+      ...parts,
+    ],
+    enabled: true,
+    role: 'OWNER',
+    canManage: true,
+    memberId: null,
+  }),
+}));
 /**
  * Hook-repoint + member-management tests for `src/hooks/useFamily.js`.
  *
@@ -153,7 +170,16 @@ describe('query hooks fetch through the correct api module under their exact key
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(family.get).toHaveBeenCalledTimes(1);
     expect(result.current.data).toEqual(data);
-    expect(queryClient.getQueryData(['family'])).toEqual(data);
+    expect(
+      queryClient.getQueryData([
+        'scope',
+        'test-user',
+        'test-family',
+        'OWNER',
+        1,
+        'family',
+      ]),
+    ).toEqual(data);
   });
 
   it('useMembers(false) → members.list(undefined) under ["members", { activeOnly: false }]', async () => {
@@ -165,9 +191,17 @@ describe('query hooks fetch through the correct api module under their exact key
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     // activeOnly=false → the hook passes undefined (no server-side filter).
     expect(members.list).toHaveBeenCalledWith(undefined, expect.anything());
-    expect(queryClient.getQueryData(['members', { activeOnly: false }])).toEqual(
-      roster,
-    );
+    expect(
+      queryClient.getQueryData([
+        'scope',
+        'test-user',
+        'test-family',
+        'OWNER',
+        1,
+        'members',
+        { activeOnly: false },
+      ]),
+    ).toEqual(roster);
   });
 
   it('useMembers(true) → members.list(true) under ["members", { activeOnly: true }]', async () => {
@@ -178,9 +212,17 @@ describe('query hooks fetch through the correct api module under their exact key
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(members.list).toHaveBeenCalledWith(true, expect.anything());
-    expect(queryClient.getQueryData(['members', { activeOnly: true }])).toEqual(
-      roster,
-    );
+    expect(
+      queryClient.getQueryData([
+        'scope',
+        'test-user',
+        'test-family',
+        'OWNER',
+        1,
+        'members',
+        { activeOnly: true },
+      ]),
+    ).toEqual(roster);
   });
 
   it('useTasks(filters) → tasks.list(mapped filter) under ["tasks", filters]', async () => {
@@ -207,7 +249,17 @@ describe('query hooks fetch through the correct api module under their exact key
       expect.anything(),
     );
     // The query key preserves the ORIGINAL public filter shape (with dueDate).
-    expect(queryClient.getQueryData(['tasks', filters])).toEqual(list);
+    expect(
+      queryClient.getQueryData([
+        'scope',
+        'test-user',
+        'test-family',
+        'OWNER',
+        1,
+        'tasks',
+        filters,
+      ]),
+    ).toEqual(list);
   });
 
   it('usePoints → points.list({}) under ["points"]', async () => {
@@ -218,7 +270,16 @@ describe('query hooks fetch through the correct api module under their exact key
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(points.list).toHaveBeenCalledWith({}, expect.anything());
-    expect(queryClient.getQueryData(['points'])).toEqual(ledger);
+    expect(
+      queryClient.getQueryData([
+        'scope',
+        'test-user',
+        'test-family',
+        'OWNER',
+        1,
+        'points',
+      ]),
+    ).toEqual(ledger);
   });
 
   it('useTemplates → templates.list() under ["templates"]', async () => {
@@ -229,7 +290,16 @@ describe('query hooks fetch through the correct api module under their exact key
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(templates.list).toHaveBeenCalledTimes(1);
-    expect(queryClient.getQueryData(['templates'])).toEqual(tpls);
+    expect(
+      queryClient.getQueryData([
+        'scope',
+        'test-user',
+        'test-family',
+        'OWNER',
+        1,
+        'templates',
+      ]),
+    ).toEqual(tpls);
   });
 
   it('useAwards → awards.list() under ["awards"]', async () => {
@@ -240,7 +310,16 @@ describe('query hooks fetch through the correct api module under their exact key
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(awards.list).toHaveBeenCalledTimes(1);
-    expect(queryClient.getQueryData(['awards'])).toEqual(list);
+    expect(
+      queryClient.getQueryData([
+        'scope',
+        'test-user',
+        'test-family',
+        'OWNER',
+        1,
+        'awards',
+      ]),
+    ).toEqual(list);
   });
 
   it('useCompletions(id) → points.memberCompletions(id) unwrapped, under ["completions", id]', async () => {
@@ -259,7 +338,17 @@ describe('query hooks fetch through the correct api module under their exact key
     );
     // The hook unwraps to the completions array only.
     expect(result.current.data).toEqual(completions);
-    expect(queryClient.getQueryData(['completions', 'm1'])).toEqual(completions);
+    expect(
+      queryClient.getQueryData([
+        'scope',
+        'test-user',
+        'test-family',
+        'OWNER',
+        1,
+        'completions',
+        'm1',
+      ]),
+    ).toEqual(completions);
   });
 
   it('useCompletions is disabled when no memberId is given (no fetch)', async () => {
@@ -294,8 +383,12 @@ describe('mutation hooks call the right api module and invalidate the exact keys
       completedByMemberId: 'm1',
     });
     // onSettled reconciles BOTH the board and the points ledger.
-    expect(spy).toHaveBeenCalledWith({ queryKey: ['tasks'] });
-    expect(spy).toHaveBeenCalledWith({ queryKey: ['points'] });
+    expect(spy).toHaveBeenCalledWith({
+      queryKey: ['scope', 'test-user', 'test-family', 'OWNER', 1],
+    });
+    expect(spy).toHaveBeenCalledWith({
+      queryKey: ['scope', 'test-user', 'test-family', 'OWNER', 1],
+    });
   });
 
   it('useReopenTask → tasks.reopen(taskId) and invalidates tasks + points', async () => {
@@ -309,8 +402,12 @@ describe('mutation hooks call the right api module and invalidate the exact keys
     });
 
     expect(tasks.reopen).toHaveBeenCalledWith('t1');
-    expect(spy).toHaveBeenCalledWith({ queryKey: ['tasks'] });
-    expect(spy).toHaveBeenCalledWith({ queryKey: ['points'] });
+    expect(spy).toHaveBeenCalledWith({
+      queryKey: ['scope', 'test-user', 'test-family', 'OWNER', 1],
+    });
+    expect(spy).toHaveBeenCalledWith({
+      queryKey: ['scope', 'test-user', 'test-family', 'OWNER', 1],
+    });
   });
 
   it('useGenerateRecurring → templates.generate({ weekStart }) and invalidates tasks', async () => {
@@ -324,7 +421,9 @@ describe('mutation hooks call the right api module and invalidate the exact keys
     });
 
     expect(templates.generate).toHaveBeenCalledWith({ weekStart: 'w1' });
-    expect(spy).toHaveBeenCalledWith({ queryKey: ['tasks'] });
+    expect(spy).toHaveBeenCalledWith({
+      queryKey: ['scope', 'test-user', 'test-family', 'OWNER', 1],
+    });
   });
 });
 
@@ -376,7 +475,15 @@ describe('member add / edit / deactivate flows (end-to-end against mocked member
     // whenever it lands.
     await waitFor(() =>
       expect(
-        queryClient.getQueryData(['members', { activeOnly: true }]),
+        queryClient.getQueryData([
+          'scope',
+          'test-user',
+          'test-family',
+          'OWNER',
+          1,
+          'members',
+          { activeOnly: true },
+        ]),
       ).toEqual([created]),
     );
   });
@@ -417,7 +524,15 @@ describe('member add / edit / deactivate flows (end-to-end against mocked member
     // sensitive to React re-render flush timing).
     await waitFor(() =>
       expect(
-        queryClient.getQueryData(['members', { activeOnly: true }]),
+        queryClient.getQueryData([
+          'scope',
+          'test-user',
+          'test-family',
+          'OWNER',
+          1,
+          'members',
+          { activeOnly: true },
+        ]),
       ).toEqual([updated]),
     );
   });
@@ -458,7 +573,15 @@ describe('member add / edit / deactivate flows (end-to-end against mocked member
     // After invalidation the active roster refetch excludes the deactivated member.
     await waitFor(() =>
       expect(
-        queryClient.getQueryData(['members', { activeOnly: true }]),
+        queryClient.getQueryData([
+          'scope',
+          'test-user',
+          'test-family',
+          'OWNER',
+          1,
+          'members',
+          { activeOnly: true },
+        ]),
       ).toEqual([]),
     );
     // The active-only query was issued with the server-side active filter.
@@ -476,7 +599,9 @@ describe('member add / edit / deactivate flows (end-to-end against mocked member
     });
 
     // A prefix ["members"] invalidation covers every ["members", { activeOnly }] cache.
-    expect(spy).toHaveBeenCalledWith({ queryKey: ['members'] });
+    expect(spy).toHaveBeenCalledWith({
+      queryKey: ['scope', 'test-user', 'test-family', 'OWNER', 1],
+    });
   });
 
   it('useSaveMember invalidates the ["members"] key after a successful save', async () => {
@@ -489,6 +614,8 @@ describe('member add / edit / deactivate flows (end-to-end against mocked member
       await result.current.mutateAsync({ data: { name: 'Bob' } });
     });
 
-    expect(spy).toHaveBeenCalledWith({ queryKey: ['members'] });
+    expect(spy).toHaveBeenCalledWith({
+      queryKey: ['scope', 'test-user', 'test-family', 'OWNER', 1],
+    });
   });
 });

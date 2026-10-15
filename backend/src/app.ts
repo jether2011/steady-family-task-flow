@@ -1,3 +1,4 @@
+import { memberViewRoutes } from './modules/member-views/views.routes.js';
 /**
  * Fastify composition root.
  *
@@ -52,6 +53,7 @@ import { authRoutes } from './modules/auth/auth.routes.js';
 // `src/modules/family/family.routes.ts` (task 5.1) registers `GET`/`PATCH
 // /api/v1/family`: the composed family DTO read and the two-table atomic update
 // (R2.1–R2.4).
+import { tenantRoutes } from './modules/tenant/tenant.routes.js';
 import { familyRoutes } from './modules/family/family.routes.js';
 // `src/modules/members/member.routes.ts` (task 5.2) registers the members CRUD +
 // soft-delete routes under `/api/v1/family/members` (R3.1–R3.6).
@@ -138,6 +140,10 @@ export function buildApp(): FastifyInstance {
           Object.entries(value)
             .filter(
               ([key]) =>
+                !(
+                  request.routeOptions.url === '/api/v1/family/awards' &&
+                  key === 'family_id'
+                ) &&
                 ![
                   'created_by_user_id',
                   'created_by_app_user_id',
@@ -159,6 +165,7 @@ export function buildApp(): FastifyInstance {
   const corsOptions: FastifyCorsOptions = {
     origin: resolveCorsOrigin(),
     credentials: true,
+    allowedHeaders: ['Authorization', 'Content-Type', 'Idempotency-Key'],
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   };
   void app.register(cors, corsOptions);
@@ -232,6 +239,7 @@ function registerRoutes(app: FastifyInstance): void {
       // family DTO and routes a flat partial update to `families` +
       // `responsible_users` atomically (R2.1–R2.4).
       familyRoutes(apiV1);
+      tenantRoutes(apiV1);
 
       // Members: `GET`/`POST /api/v1/family/members` and
       // `PATCH`/`DELETE /api/v1/family/members/:id` (task 5.2). CRUD with soft
@@ -274,6 +282,7 @@ function registerRoutes(app: FastifyInstance): void {
       // desc; an invalid `period` → `422` (R10.1, R15.1–R15.5). Task 10.2 adds
       // awards CRUD + redeem to this same module without changing app.ts.
       gamificationRoutes(apiV1);
+      memberViewRoutes(apiV1);
 
       // Dashboard & board: `GET /api/v1/family/dashboard` and
       // `GET /api/v1/family/board?weekStart` (task 11.1). The dashboard returns

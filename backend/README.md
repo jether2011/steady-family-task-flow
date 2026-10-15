@@ -6,10 +6,9 @@ A Node.js + TypeScript REST API built on Fastify 5, backed by a hosted Supabase 
 - Interactive API docs (OpenAPI): `/api/docs`
 - Liveness: `/api/v1/health` - Readiness: `/api/v1/ready`
 
-> Bootstrap: the responsible-user and family rows are created ONLY by the first
-> `GET /api/v1/me` after login. No other route creates them, so a client must
-> call `/me` once before any `/family` read/write — otherwise those return
-> `404 NOT_FOUND`. (The frontend's AuthContext does this automatically on login.)
+> `GET /api/v1/me` resolves identity and membership without creating a family.
+> Explicit owner creation uses `POST /api/v1/families`; unpaid drafts remain
+> behind the onboarding/subscription boundary. See the [tenant rollout guide](../docs/implementation/04-tenant-onboarding-rollout.md).
 
 ## Tech stack
 
@@ -80,6 +79,8 @@ The schema lives in `src/supabase/migrations/` as plain SQL, applied in numeric 
 | `005_realtime.sql` | Adds tables to the `supabase_realtime` publication |
 | `006_update_family.sql` | Atomic family/responsible-user update function |
 | `007_membership_access.sql` | Canonical identities, owner backfill, memberships, transactional authorization and role policies |
+| `008_member_views.sql` | Snapshot member reads, safe directory/profile, aggregate ranking, history indexes |
+| `009_tenant_onboarding.sql` | Explicit unpaid drafts, idempotent creation, owner onboarding, legacy access policy and lifecycle gates |
 | `seed.sql` | Idempotent demo family data |
 
 Apply them with any of these:
@@ -229,4 +230,6 @@ Vercel targets serverless/static workloads and does not keep a long-lived Fastif
 - 401 on every request: the frontend is sending no/expired token, or the Supabase project URL does not match the one that issued the JWT.
 - CORS errors in the browser: CORS_ORIGIN must list the frontend's exact origin (scheme + host + port, no trailing slash).
 - /api/v1/ready returns 503: the backend cannot reach Supabase - check SUPABASE_URL and network egress.
-- `GET`/`PATCH /family` returns 404 right after login: `GET /me` has not run yet, so the family row doesn't exist. Call `/me` first (the frontend does this automatically).
+- `GET`/`PATCH /family` returns 404 without an active membership; `/me` reports NO_ACCESS or REVOKED. Draft product access returns 403; owners use `/family/onboarding` to resume setup. Login does not create a family.
+
+Member APIs, paginated history and rollout: [specification 03 guide](../docs/implementation/03-member-dashboard-rollout.md). Enable backend `MEMBER_VIEWS_ENABLED` only after migration 008 and staging acceptance.
