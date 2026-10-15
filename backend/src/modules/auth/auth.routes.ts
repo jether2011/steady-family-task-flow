@@ -43,6 +43,7 @@ const MembershipSchema = z.object({
 export const MePayloadSchema = z.discriminatedUnion('state', [
   z.object({
     state: z.enum(['NO_ACCESS', 'REVOKED']),
+    signupAvailable: z.boolean().optional(),
     user: UserSchema,
     family: z.null(),
     membership: z.null(),

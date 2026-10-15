@@ -78,11 +78,11 @@ values (
 on conflict (id) do nothing;
 
 -- 3) Family (Rodrigues Family), owned by Jether. ------------------------------
-insert into families (id, responsible_user_id, name)
+insert into families (id, responsible_user_id, name, creation_source, legacy_access_eligible, lifecycle, profile_completed_at, established_at)
 values (
   '1b000000-0000-4000-8000-000000000001',
   '09000000-0000-4000-8000-000000000001',
-  'Rodrigues Family'
+  'Rodrigues Family', 'LEGACY', true, 'ESTABLISHED', now(), now()
 )
 on conflict (id) do nothing;
 

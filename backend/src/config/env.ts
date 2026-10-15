@@ -25,6 +25,14 @@ import { z } from 'zod';
  *   Set it only to point verification at a non-default JWKS location.
  */
 const envSchema = z.object({
+  SELF_SERVICE_SIGNUP_ENABLED: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((v) => v === 'true'),
+  BILLING_AVAILABLE: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((v) => v === 'true'),
   MEMBER_VIEWS_ENABLED: z
     .enum(['true', 'false'])
     .default('false')

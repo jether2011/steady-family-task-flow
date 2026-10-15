@@ -13,8 +13,7 @@
  *
  *   - `request.ctx` — the resolved request context mapping
  *     `auth.uid()` → `responsible_users.id` → `families.id`. `familyId` is
- *     `null` when the responsible user has not yet bootstrapped a family (only
- *     `GET /me` creates one — task 4.2); routes that require a family assert its
+ *     `null` when the subject has no active family membership; routes assert its
  *     presence and otherwise return `404 NOT_FOUND`.
  *
  * The augmentation lives in its own module (imported for its side effect by the
@@ -75,8 +74,7 @@ declare module 'fastify' {
     authUserId?: string;
     /**
      * Verified non-`sub` identity claims (email/name/avatar) from the session
-     * JWT. Set by the authentication hook; used by `/me` to seed the
-     * responsible-user profile on first login. `undefined` before the hook runs.
+     * JWT. Set by the authentication hook; presentation only. `undefined` before the hook runs.
      */
     authClaims?: AuthClaims;
     /**

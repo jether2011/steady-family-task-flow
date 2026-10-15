@@ -7,6 +7,7 @@ import {
   Forbidden,
 } from '../shared/errors/index.js';
 import { resolveMembership } from '../modules/access/access.service.js';
+import { tenantState } from '../modules/tenant/tenant.policy.js';
 import type { RequestContext } from './types.js';
 import './types.js';
 export async function resolveContext(
@@ -42,6 +43,7 @@ export async function contextHook(request: FastifyRequest) {
   if (!request.authUserId) throw new Unauthorized();
   // /me resolves/claims once in its service; email confirmation is valid with revoked membership.
   if (
+    request.routeOptions.url === '/api/v1/families' ||
     request.routeOptions.url === '/api/v1/me' ||
     request.routeOptions.url === '/api/v1/me/email-change/confirm'
   )
@@ -50,6 +52,24 @@ export async function contextHook(request: FastifyRequest) {
   requireFamilyContext(request);
   const ctx = request.ctx;
   const url = request.routeOptions.url ?? '';
+  if (url === '/api/v1/family/onboarding') {
+    if (ctx.role !== 'OWNER') throw new Forbidden();
+    return;
+  }
+  const { data: tenant, error } = await getServiceRoleClient()
+    .from('families')
+    .select(
+      'lifecycle,creation_source,legacy_access_eligible,profile_completed_at',
+    )
+    .eq('id', ctx.familyId!)
+    .single();
+  if (error) throw error;
+  if (tenantState(tenant) !== 'READY')
+    throw new AppError(
+      'TENANT_ACCESS_RESTRICTED',
+      403,
+      'Complete family onboarding before opening the dashboard',
+    );
   if (ctx.role === 'MEMBER') {
     const allowed = new Set([
       '/api/v1/family',

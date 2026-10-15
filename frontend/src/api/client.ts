@@ -226,14 +226,19 @@ export async function request<T>(
     const currentScope =
       !signal?.aborted &&
       (res.status === 401 ||
-        (res.status === 403 && err.code === 'ACCESS_REVOKED')) &&
+        (res.status === 403 &&
+          ['ACCESS_REVOKED', 'TENANT_ACCESS_RESTRICTED'].includes(err.code))) &&
       (await resolveAccessToken()) === token;
     if (res.status === 401 && currentScope) {
       // Session expired / missing: redirect to login, then still throw so the
       // caller (and TanStack Query) sees the failure (R24.5).
       config?.onUnauthorized();
     }
-    if (currentScope && res.status === 403 && err.code === 'ACCESS_REVOKED')
+    if (
+      currentScope &&
+      res.status === 403 &&
+      ['ACCESS_REVOKED', 'TENANT_ACCESS_RESTRICTED'].includes(err.code)
+    )
       config?.onAccessRevoked?.();
     throw err;
   }

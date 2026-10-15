@@ -55,7 +55,7 @@ export interface ResponsibleUser {
   avatar_url: string | null;
 }
 
-/** `GET /me` payload: profile + family (family created on first login). */
+/** `GET /me` payload: resolved identity and existing membership. */
 export interface AccessSummary {
   membershipId: string;
   email: string | null;
@@ -64,6 +64,7 @@ export interface AccessSummary {
   accessVersion: number;
 }
 export type MePayload = {
+  signupAvailable?: boolean;
   user: { id: string; displayName: string | null; avatarUrl: string | null };
   capabilities: string[];
 } & (

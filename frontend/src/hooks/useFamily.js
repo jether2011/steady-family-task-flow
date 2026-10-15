@@ -87,9 +87,7 @@ export const useCreateFamily = () => {
   const qc = useQueryClient();
   const scope = useScope();
   return useMutation({
-    // This legacy hook updates the resolved family profile; tenant creation is separate. It maps to a
-    // PATCH /family update rather than a dedicated create endpoint.
-    mutationFn: (data) => family.update(data),
+    mutationFn: ({ data, requestKey }) => family.create(data, requestKey),
     onSuccess: () => qc.invalidateQueries({ queryKey: scope.prefix }),
   });
 };

@@ -53,6 +53,7 @@ import { authRoutes } from './modules/auth/auth.routes.js';
 // `src/modules/family/family.routes.ts` (task 5.1) registers `GET`/`PATCH
 // /api/v1/family`: the composed family DTO read and the two-table atomic update
 // (R2.1–R2.4).
+import { tenantRoutes } from './modules/tenant/tenant.routes.js';
 import { familyRoutes } from './modules/family/family.routes.js';
 // `src/modules/members/member.routes.ts` (task 5.2) registers the members CRUD +
 // soft-delete routes under `/api/v1/family/members` (R3.1–R3.6).
@@ -164,6 +165,7 @@ export function buildApp(): FastifyInstance {
   const corsOptions: FastifyCorsOptions = {
     origin: resolveCorsOrigin(),
     credentials: true,
+    allowedHeaders: ['Authorization', 'Content-Type', 'Idempotency-Key'],
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   };
   void app.register(cors, corsOptions);
@@ -237,6 +239,7 @@ function registerRoutes(app: FastifyInstance): void {
       // family DTO and routes a flat partial update to `families` +
       // `responsible_users` atomically (R2.1–R2.4).
       familyRoutes(apiV1);
+      tenantRoutes(apiV1);
 
       // Members: `GET`/`POST /api/v1/family/members` and
       // `PATCH`/`DELETE /api/v1/family/members/:id` (task 5.2). CRUD with soft

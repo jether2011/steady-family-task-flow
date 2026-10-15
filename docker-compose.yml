@@ -21,6 +21,8 @@ services:
     # Config comes from the environment / root .env (R29.4). The service-role
     # key is interpolated from the host — never a literal value in this file.
     environment:
+      SELF_SERVICE_SIGNUP_ENABLED: ${SELF_SERVICE_SIGNUP_ENABLED:-false}
+      BILLING_AVAILABLE: ${BILLING_AVAILABLE:-false}
       MEMBER_VIEWS_ENABLED: ${MEMBER_VIEWS_ENABLED:-false}
       MEMBERSHIP_ACCESS_ENABLED: ${MEMBERSHIP_ACCESS_ENABLED:-false}
       ACCESS_EMAIL_DELIVERY_URL: ${ACCESS_EMAIL_DELIVERY_URL:-}

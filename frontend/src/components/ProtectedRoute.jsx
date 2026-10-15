@@ -30,6 +30,10 @@ export default function ProtectedRoute({
     ['NO_ACCESS', 'REVOKED', 'PAYMENT_REQUIRED'].includes(access.state)
   )
     return <Navigate replace to={accessDestination(access)} />;
+  if (access.state === 'ONBOARDING_REQUIRED') {
+    const target = accessDestination(access);
+    if (location.pathname !== target) return <Navigate replace to={target} />;
+  }
   if (access.membership?.role === 'MEMBER') {
     if (!access.membership.memberId)
       return (

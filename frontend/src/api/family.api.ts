@@ -11,7 +11,7 @@
  *   PATCH /family  -> { family }                     (unwrapped to Family)
  */
 
-import { get, patch } from './client';
+import { get, patch, request } from './client';
 import type { Family, FamilyUpdate, MePayload } from './types';
 
 /** Envelope wrapper used by the `/family` routes. */
@@ -20,7 +20,7 @@ interface FamilyEnvelope {
 }
 
 /**
- * `GET /me` — current profile + family (the family is created on first login).
+ * `GET /me` — current access resolution (never creates a family).
  * Returned whole because callers need both `family` and `responsibleUser`.
  *
  * Note: `/me` auth wiring lives with AuthContext (task 16.1); this helper is a
@@ -50,7 +50,26 @@ export async function update(
  * style described in the design. `getFamily` is aliased to `get` here to avoid
  * shadowing the imported client `get`.
  */
+export interface OnboardingResult {
+  family: Family;
+  lifecycle: 'DRAFT' | 'ESTABLISHED';
+  profileCompleted: boolean;
+  nextAction: 'COMPLETE_PROFILE' | 'SUBSCRIBE' | 'OPEN_DASHBOARD';
+  billingAvailable: boolean;
+}
+export type TenantProfile = Required<
+  Pick<Family, 'name' | 'responsible_name' | 'relationship'>
+>;
 export const family = {
+  create: (body: TenantProfile, key: string) =>
+    request<OnboardingResult>('POST', '/families', {
+      body,
+      headers: { 'Idempotency-Key': key },
+    }),
+  onboarding: (signal?: AbortSignal) =>
+    get<OnboardingResult>('/family/onboarding', undefined, signal),
+  updateOnboarding: (body: Partial<TenantProfile>) =>
+    patch<OnboardingResult>('/family/onboarding', body),
   me,
   get: getFamily,
   update,

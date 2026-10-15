@@ -171,7 +171,8 @@ vi.mock('@/hooks/useRealtime', () => ({
 // Onboarding reads the Google profile via useAuth to prefill "Your name".
 vi.mock('@/lib/AuthContext', () => ({
   useAuth: () => ({
-    user: { full_name: 'Tester', email: 'tester@example.com' },
+    isAuthenticated: true,
+    access: {state:'NO_ACCESS',signupAvailable:true,user:{displayName:'Tester'}},
   }),
 }));
 
@@ -437,7 +438,7 @@ describe('Onboarding appears for a first-login user with no members (R20.3)', ()
     hookState.members = [];
     hookState.tasks = [];
 
-    renderWithProviders(<Onboarding />);
+    renderWithProviders(<Onboarding creating />);
 
     // Welcome / setup copy and the single "Create family" action (the sample
     // data option was removed).

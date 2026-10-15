@@ -1,10 +1,10 @@
 import { useScope } from '@/hooks/useScope';
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
-import { useCreateFamily, useFamily } from '@/hooks/useFamily';
+import { useQuery } from '@tanstack/react-query';
+import { family } from '@/api/family.api';
+import { accessDestination, loginPath } from '@/lib/authReturnTo';
 import { useAuth } from '@/lib/AuthContext';
-import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,93 +15,110 @@ import {
   SelectContent,
   SelectItem,
 } from '@/components/ui/select';
-import { RELATIONSHIP_LABELS, isFamilyConfigured } from '@/lib/familyUtils';
+import { RELATIONSHIP_LABELS } from '@/lib/familyUtils';
 import { Loader2, ArrowRight } from 'lucide-react';
 
 const RELATIONSHIPS = ['FATHER', 'MOTHER', 'GUARDIAN', 'OTHER'];
 
-export default function Onboarding() {
+export default function Onboarding({ creating = false }) {
   const scope = useScope();
   const navigate = useNavigate();
-  const qc = useQueryClient();
-  const { toast } = useToast();
-  const { user, retryAccessResolution } = useAuth();
-  const { data: family, isLoading } = useFamily();
-
-  // Membership resolution identifies an existing household. Onboarding
-  // UPDATES that household profile (PATCH /family) — it never creates a
-  // second family. `useCreateFamily` maps to that PATCH update.
-  const createFamily = useCreateFamily();
-
-  // Prefill the responsible name from the verified Google profile so the user
-  // usually only has to pick a role and confirm.
+  const auth = useAuth();
+  const {
+    data: onboarding,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: scope.key('onboarding'),
+    queryFn: ({ signal }) => family.onboarding(signal),
+    enabled: !creating && auth.access?.membership?.role === 'OWNER',
+    retry: false,
+  });
+  const intent = useRef({ body: null, key: crypto.randomUUID() });
   const [form, setForm] = useState({
     name: '',
-    responsible_name: '',
+    responsible_name: auth.access?.user?.displayName ?? '',
     relationship: 'FATHER',
   });
   const [initialized, setInitialized] = useState(false);
-
-  // Seed the form once the family + user have loaded (family.name may already
-  // be the default "My Family"; the Google full_name seeds "Your name").
-  if (!initialized && family) {
+  const [saving, setSaving] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+  if (!initialized && onboarding) {
     setForm({
-      name: family.name && family.name !== 'My Family' ? family.name : '',
-      responsible_name: user?.full_name || '',
-      relationship: family.relationship || 'FATHER',
+      name:
+        onboarding.family.name === 'My Family' ? '' : onboarding.family.name,
+      responsible_name:
+        onboarding.family.responsible_name ??
+        auth.access?.user?.displayName ??
+        '',
+      relationship: onboarding.family.relationship ?? 'FATHER',
     });
     setInitialized(true);
   }
-
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-
-  const errorMessage = (err) =>
-    (err && typeof err.message === 'string' && err.message.trim()) ||
-    'Something went wrong. Please try again.';
-
-  // Already finished setup? Don't show onboarding again — go to the dashboard.
-  if (!isLoading && isFamilyConfigured(family)) {
-    return <Navigate to="/" replace />;
-  }
-
-  const handleCreate = async (e) => {
+  if (
+    auth.isLoadingAuth ||
+    (!creating && isLoading && auth.access?.membership?.role === 'OWNER')
+  )
+    return (
+      <main role="status" className="p-8">
+        Loading family profile…
+      </main>
+    );
+  if (!auth.isAuthenticated) return <Navigate replace to={loginPath('/')} />;
+  if (auth.authError) return <Navigate replace to="/access-error" />;
+  if (
+    creating &&
+    (auth.access?.state !== 'NO_ACCESS' || !auth.access?.signupAvailable)
+  )
+    return <Navigate replace to={accessDestination(auth.access)} />;
+  if (
+    !creating &&
+    (auth.access?.membership?.role !== 'OWNER' ||
+      auth.access?.state !== 'ONBOARDING_REQUIRED')
+  )
+    return <Navigate replace to={accessDestination(auth.access)} />;
+  if (error)
+    return (
+      <main className="p-8">
+        <p role="alert">Could not load family profile.</p>
+        <button onClick={() => refetch()}>Retry</button>
+      </main>
+    );
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.name.trim()) {
-      toast({ title: 'Family name is required', variant: 'destructive' });
-      return;
-    }
-    if (!form.responsible_name.trim()) {
-      toast({ title: 'Your name is required', variant: 'destructive' });
-      return;
-    }
+    if (saving) return;
+    setSaving(true);
+    setSubmitError('');
     try {
-      await createFamily.mutateAsync({
+      const body = {
+        ...form,
         name: form.name.trim(),
         responsible_name: form.responsible_name.trim(),
-        relationship: form.relationship,
-      });
-      // Make the freshly-configured family authoritative before navigating so
-      // Layout sees it as configured and renders the app (not a redirect loop).
-      await qc.refetchQueries({ queryKey: scope.key('family') });
-      await retryAccessResolution?.();
-      navigate('/', { replace: true });
+      };
+      const encoded = JSON.stringify(body);
+      if (intent.current.body !== null && intent.current.body !== encoded)
+        intent.current.key = crypto.randomUUID();
+      intent.current.body = encoded;
+      const result = creating
+        ? await family.create(body, intent.current.key)
+        : await family.updateOnboarding(body);
+      await auth.retryAccessResolution();
+      navigate(
+        result.nextAction === 'OPEN_DASHBOARD'
+          ? '/'
+          : result.nextAction === 'COMPLETE_PROFILE'
+            ? '/onboarding'
+            : '/subscribe',
+        { replace: true },
+      );
     } catch (err) {
-      toast({
-        title: 'Error',
-        description: errorMessage(err),
-        variant: 'destructive',
-      });
+      setSubmitError(err?.message || 'Could not save family. Please retry.');
+    } finally {
+      setSaving(false);
     }
   };
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-accent via-background to-background p-4">
       <div className="w-full max-w-md">
@@ -115,13 +132,15 @@ export default function Onboarding() {
             Welcome to FamTask
           </h1>
           <p className="text-muted-foreground text-sm mt-2">
-            Let's set up your family task board. You're the responsible —
-            everyone else is a member you manage.
+            {creating
+              ? 'Create a family draft. A subscription will be required before using your board.'
+              : 'Complete your family profile to continue.'}
           </p>
         </div>
 
         <div className="rounded-3xl border border-border bg-card p-6 shadow-sm">
-          <form onSubmit={handleCreate} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {submitError && <p role="alert">{submitError}</p>}
             <div className="space-y-1.5">
               <Label htmlFor="fname">Family name</Label>
               <Input
@@ -130,6 +149,7 @@ export default function Onboarding() {
                 onChange={(e) => set('name', e.target.value)}
                 placeholder="e.g. Rodrigues Family"
                 autoFocus
+                maxLength={120}
                 required
               />
             </div>
@@ -140,16 +160,17 @@ export default function Onboarding() {
                 value={form.responsible_name}
                 onChange={(e) => set('responsible_name', e.target.value)}
                 placeholder="e.g. Jether"
+                maxLength={120}
                 required
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Your role</Label>
+              <Label htmlFor="relationship">Relationship to the family</Label>
               <Select
                 value={form.relationship}
                 onValueChange={(v) => set('relationship', v)}
               >
-                <SelectTrigger>
+                <SelectTrigger id="relationship">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -161,17 +182,13 @@ export default function Onboarding() {
                 </SelectContent>
               </Select>
             </div>
-            <Button
-              type="submit"
-              className="w-full h-11"
-              disabled={createFamily.isPending}
-            >
-              {createFamily.isPending ? (
+            <Button type="submit" className="w-full h-11" disabled={saving}>
+              {saving ? (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               ) : (
                 <ArrowRight className="w-4 h-4 mr-2" />
               )}
-              Create family
+              {creating ? 'Create family' : 'Save profile'}
             </Button>
           </form>
         </div>

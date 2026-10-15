@@ -43,8 +43,9 @@ export interface ResponsibleUserDTO {
   avatar_url: string | null;
 }
 
-/** `GET /me` bootstrap payload (creates the family if absent, R1.4). */
+/** `GET /me` access resolution payload (never creates a family). */
 export type MePayload = {
+  signupAvailable?: boolean;
   user: { id: string; displayName: string | null; avatarUrl: string | null };
   capabilities: string[];
 } & (

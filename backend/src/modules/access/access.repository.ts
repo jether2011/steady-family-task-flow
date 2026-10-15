@@ -2,6 +2,11 @@ import { getServiceRoleClient } from '../../config/supabase.js';
 import { AppError } from '../../shared/errors/index.js';
 import { mutationIdentity } from './access.store.js';
 const errors: Record<string, number> = {
+  IDEMPOTENCY_CONFLICT: 409,
+  TENANT_ASSOCIATION_CONFLICT: 409,
+  EMAIL_VERIFICATION_REQUIRED: 403,
+  SIGNUP_UNAVAILABLE: 503,
+  TENANT_ACCESS_RESTRICTED: 403,
   ACCESS_VERSION_CONFLICT: 409,
   ACCESS_CONFLICT: 409,
   ACCESS_REVOKED: 403,
