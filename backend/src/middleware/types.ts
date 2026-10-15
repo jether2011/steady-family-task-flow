@@ -22,21 +22,30 @@
  * contract has a single documented home.
  */
 import 'fastify';
+import type { AccessRole } from '../modules/access/access.types.js';
 
 /**
  * Resolved per-request identity/ownership context.
  *
  * Every field is derived server-side from the verified session — never from the
  * request body, query, or headers (R1.7, R23.2). `familyId` is nullable because
- * a freshly-authenticated responsible user may not have a family yet; the `/me`
- * bootstrap route is the only place a family is created.
+ * a verified subject may have no active membership. `/me` only resolves access;
+ * tenant creation is a separate lifecycle.
  */
 export interface RequestContext {
+  readonly authUserId: string;
+  readonly appUserId: string;
+  readonly ownerResponsibleUserId: string | null;
+  readonly membershipId: string | null;
+  readonly role: AccessRole | null;
+  readonly memberId: string | null;
+  readonly accessVersion: number | null;
+  readonly accessState: 'READY' | 'NO_ACCESS' | 'REVOKED';
   /** Supabase auth user id (the verified JWT `sub`). */
   readonly userId: string;
-  /** `responsible_users.id` for this auth user, or `null` if none exists yet. */
+  /** Legacy owner `responsible_users.id` for the resolved family; never the acting manager identity. */
   readonly responsibleUserId: string | null;
-  /** `families.id` owned by the responsible user, or `null` if none exists yet. */
+  /** `families.id` for the active membership, or `null` when access is absent. */
   readonly familyId: string | null;
 }
 
@@ -44,14 +53,12 @@ export interface RequestContext {
  * Verified identity claims carried by the Supabase session JWT, beyond `sub`.
  *
  * These are read ONLY from the cryptographically-verified token (see
- * `authentication.ts`), so they are trustworthy identity — never sourced from
- * the request body/query/headers (R1.7, R23.2). They exist to seed the
- * `responsible_users` row on first-login bootstrap (`GET /me`, task 4.2) with a
- * sensible email/display name/avatar; every field is optional because a token
- * may omit any of them.
+ * `authentication.ts`), but editable profile claims are not authorization evidence. Never source them from
+ * the request body/query/headers (R1.7, R23.2). Authorization uses only the verified subject and provider-admin confirmed
+ * mailbox. These optional claims remain for compatibility and presentation.
  */
 export interface AuthClaims {
-  /** Verified `email` claim, when present. */
+  /** JWT email claim; do not use it to claim memberships. */
   readonly email?: string;
   /** Best-effort display name from Google-backed `user_metadata`. */
   readonly name?: string;

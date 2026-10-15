@@ -28,18 +28,34 @@ const FamilyDTOSchema = z.object({
   responsible_name: z.string().nullable(),
 });
 
-/** The authenticated adult surfaced by `/me`. */
-const ResponsibleUserDTOSchema = z.object({
-  id: z.string().uuid(),
-  email: z.string().nullable(),
-  avatar_url: z.string().nullable(),
-});
-
 /** `GET /me` 200 response envelope. */
-const MePayloadSchema = z.object({
-  family: FamilyDTOSchema,
-  responsibleUser: ResponsibleUserDTOSchema,
+const UserSchema = z.object({
+  id: z.uuid(),
+  displayName: z.string().nullable(),
+  avatarUrl: z.string().nullable(),
 });
+const MembershipSchema = z.object({
+  id: z.uuid(),
+  role: z.enum(['OWNER', 'MANAGER', 'MEMBER']),
+  memberId: z.uuid().nullable(),
+  accessVersion: z.number().int(),
+});
+export const MePayloadSchema = z.discriminatedUnion('state', [
+  z.object({
+    state: z.enum(['NO_ACCESS', 'REVOKED']),
+    user: UserSchema,
+    family: z.null(),
+    membership: z.null(),
+    capabilities: z.array(z.string()).length(0),
+  }),
+  z.object({
+    state: z.enum(['READY', 'ONBOARDING_REQUIRED', 'PAYMENT_REQUIRED']),
+    user: UserSchema,
+    family: FamilyDTOSchema,
+    membership: MembershipSchema,
+    capabilities: z.array(z.string()),
+  }),
+]);
 
 /**
  * Register the auth/bootstrap routes on the given (already authenticated)

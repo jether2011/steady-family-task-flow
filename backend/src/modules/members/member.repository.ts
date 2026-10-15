@@ -1,3 +1,6 @@
+import { env } from '../../config/env.js';
+import { Forbidden } from '../../shared/errors/index.js';
+import { resourceWrite } from '../access/access.repository.js';
 /**
  * Member repository — the ONLY layer in this module that talks to Supabase.
  *
@@ -79,26 +82,25 @@ export async function createMember(
   familyId: string,
   input: MemberCreateInput,
 ): Promise<FamilyMemberRow> {
-  const db = getServiceRoleClient();
-
-  const { data, error } = await db
-    .from('family_members')
-    .insert({
+  if (input.access && !env.MEMBERSHIP_ACCESS_ENABLED)
+    throw new Forbidden('New access provisioning is disabled');
+  const [data] = await resourceWrite<FamilyMemberRow>(
+    'family_members',
+    'insert',
+    familyId,
+    null,
+    {
       family_id: familyId,
       name: input.name,
       member_type: input.member_type,
       avatar_url: input.avatar_url ?? null,
       color: input.color ?? null,
       birth_year: input.birth_year ?? null,
-    })
-    .select(MEMBER_COLUMNS)
-    .single<FamilyMemberRow>();
+      ...(input.access ? { access: input.access } : {}),
+    },
+  );
 
-  if (error) {
-    throw error;
-  }
-
-  return data;
+  return data!;
 }
 
 /**
@@ -125,7 +127,7 @@ export async function findMemberById(
     throw error;
   }
 
-  return data;
+  return data!;
 }
 
 /**
@@ -145,21 +147,16 @@ export async function updateMember(
   id: string,
   patch: MemberUpdateInput,
 ): Promise<FamilyMemberRow> {
-  const db = getServiceRoleClient();
+  const written = await resourceWrite<FamilyMemberRow>(
+    'family_members',
+    'update',
+    familyId,
+    id,
+    patch,
+  );
+  const data = written[0]!;
 
-  const { data, error } = await db
-    .from('family_members')
-    .update(patch)
-    .eq('id', id)
-    .eq('family_id', familyId)
-    .select(MEMBER_COLUMNS)
-    .single<FamilyMemberRow>();
-
-  if (error) {
-    throw error;
-  }
-
-  return data;
+  return data!;
 }
 
 /**
@@ -178,19 +175,14 @@ export async function deactivateMember(
   familyId: string,
   id: string,
 ): Promise<FamilyMemberRow> {
-  const db = getServiceRoleClient();
+  const written = await resourceWrite<FamilyMemberRow>(
+    'family_members',
+    'update',
+    familyId,
+    id,
+    { active: false },
+  );
+  const data = written[0]!;
 
-  const { data, error } = await db
-    .from('family_members')
-    .update({ active: false })
-    .eq('id', id)
-    .eq('family_id', familyId)
-    .select(MEMBER_COLUMNS)
-    .single<FamilyMemberRow>();
-
-  if (error) {
-    throw error;
-  }
-
-  return data;
+  return data!;
 }

@@ -14,7 +14,7 @@ import {
   LogOut,
   Gift,
   Repeat,
-  ScrollText
+  ScrollText,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -26,7 +26,7 @@ const navItems = [
   { to: '/family-awards', label: 'Awards', icon: Gift },
   { to: '/task-templates', label: 'Templates', icon: Repeat },
   { to: '/points-history', label: 'History', icon: ScrollText },
-  { to: '/settings', label: 'Settings', icon: Settings }
+  { to: '/settings', label: 'Settings', icon: Settings },
 ];
 
 function NavItem({ to, label, icon: Icon, end }) {
@@ -39,7 +39,7 @@ function NavItem({ to, label, icon: Icon, end }) {
           'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors',
           isActive
             ? 'bg-primary text-primary-foreground shadow-sm'
-            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
         )
       }
     >
@@ -57,7 +57,7 @@ function MobileNavItem({ to, label, icon: Icon, end }) {
       className={({ isActive }) =>
         cn(
           'flex-shrink-0 w-16 flex flex-col items-center gap-1 py-2.5 text-[10px] font-medium transition-colors',
-          isActive ? 'text-primary' : 'text-muted-foreground'
+          isActive ? 'text-primary' : 'text-muted-foreground',
         )
       }
     >
@@ -69,7 +69,7 @@ function MobileNavItem({ to, label, icon: Icon, end }) {
 
 export default function Layout() {
   const { data: family, isLoading } = useFamily();
-  const { logout } = useAuth();
+  const { logout, access } = useAuth();
 
   if (isLoading) {
     return (
@@ -82,7 +82,7 @@ export default function Layout() {
   // The family row always exists after login (auto-created by GET /me), so the
   // gate is "has the user finished onboarding?", not "does a family exist?".
   // Until relationship + responsible_name are set, send the user to onboarding.
-  if (!isFamilyConfigured(family)) {
+  if (!isFamilyConfigured(family) && access?.membership?.role === 'OWNER') {
     return <Navigate to="/onboarding" replace />;
   }
 
@@ -92,11 +92,17 @@ export default function Layout() {
         <div className="p-6">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center shadow-sm">
-              <span className="text-primary-foreground font-bold text-lg">F</span>
+              <span className="text-primary-foreground font-bold text-lg">
+                F
+              </span>
             </div>
             <div className="min-w-0">
-              <h1 className="font-heading font-bold text-lg leading-none">FamTask</h1>
-              <p className="text-xs text-muted-foreground mt-1 truncate max-w-[150px]">{family.name}</p>
+              <h1 className="font-heading font-bold text-lg leading-none">
+                FamTask
+              </h1>
+              <p className="text-xs text-muted-foreground mt-1 truncate max-w-[150px]">
+                {family.name}
+              </p>
             </div>
           </div>
         </div>
@@ -127,7 +133,9 @@ export default function Layout() {
         <header className="lg:hidden sticky top-0 z-30 flex items-center justify-between px-4 h-14 border-b border-border bg-card/80 backdrop-blur">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-sm">F</span>
+              <span className="text-primary-foreground font-bold text-sm">
+                F
+              </span>
             </div>
             <span className="font-heading font-bold">FamTask</span>
           </div>

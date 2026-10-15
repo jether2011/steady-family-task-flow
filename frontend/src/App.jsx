@@ -1,6 +1,6 @@
-import { Toaster } from "@/components/ui/toaster"
-import { QueryClientProvider } from '@tanstack/react-query'
-import { queryClientInstance } from '@/lib/query-client'
+import { Toaster } from '@/components/ui/toaster';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClientInstance } from '@/lib/query-client';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider } from '@/lib/AuthContext';
@@ -8,6 +8,8 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 import ScrollToTop from './components/ScrollToTop';
 // Add page imports here
 import Layout from '@/components/Layout';
+import AccessEmailConfirm from '@/pages/AccessEmailConfirm';
+import AccessStatus from '@/pages/AccessStatus';
 import Login from '@/pages/Login';
 import Home from '@/pages/Home';
 import Board from '@/pages/Board';
@@ -21,15 +23,18 @@ import MemberProfile from '@/pages/MemberProfile';
 import PointsHistory from '@/pages/PointsHistory';
 import FamilyAwards from '@/pages/FamilyAwards';
 
-// Google OAuth is the only authentication method (R1.8 / DP-3). Every route is
-// gated by ProtectedRoute: while the Supabase session is resolving it shows a
-// loading fallback, and when there is no session it renders the single
-// "Continue with Google" login screen. Wall Mode and all other routes require
-// auth as well.
+// Public login and access notices resolve identity before protected family pages.
 const AuthenticatedApp = () => {
   return (
     <Routes>
-      <Route element={<ProtectedRoute unauthenticatedElement={<Login />} />}>
+      <Route path="/login" element={<Login />} />
+      {['/no-access', '/access-revoked', '/access-error', '/subscribe'].map(
+        (path) => (
+          <Route key={path} path={path} element={<AccessStatus />} />
+        ),
+      )}
+      <Route path="/access-email-confirm" element={<AccessEmailConfirm />} />
+      <Route element={<ProtectedRoute />}>
         <Route path="/onboarding" element={<Onboarding />} />
         <Route element={<Layout />}>
           <Route path="/" element={<Home />} />
@@ -49,9 +54,7 @@ const AuthenticatedApp = () => {
   );
 };
 
-
 function App() {
-
   return (
     <AuthProvider>
       <QueryClientProvider client={queryClientInstance}>
@@ -62,7 +65,7 @@ function App() {
         <Toaster />
       </QueryClientProvider>
     </AuthProvider>
-  )
+  );
 }
 
-export default App
+export default App;

@@ -1,3 +1,4 @@
+import { familyAction } from '../access/access.repository.js';
 /**
  * Completion repository — the ONLY layer in this module that talks to Supabase
  * (task 7.1).
@@ -35,7 +36,7 @@ import type { FamilyMemberRow, TaskRow } from '../../shared/types/index.js';
 /** Columns selected for a task row (mirrors the tasks module). */
 const TASK_COLUMNS =
   'id, family_id, template_id, title, description, assigned_member_id, ' +
-  'created_by_user_id, status, priority, points, due_date, due_time, ' +
+  'created_by_app_user_id, created_by_user_id, status, priority, points, due_date, due_time, ' +
   'week_start, carried_from_task_id, created_at, updated_at';
 
 /** Columns selected for a family member row (mirrors the members module). */
@@ -158,9 +159,7 @@ export async function completeTaskRpc(
   memberId: string,
   responsibleUserId: string,
 ): Promise<CompleteTaskRpcResult> {
-  const db = getServiceRoleClient();
-
-  const { data, error } = await db.rpc('complete_task', {
+  const { data, error } = await actionResult('complete_task', {
     p_task_id: taskId,
     p_member_id: memberId,
     p_responsible_user_id: responsibleUserId,
@@ -207,9 +206,7 @@ export async function completeTaskRpc(
 export async function reopenTaskRpc(
   taskId: string,
 ): Promise<ReopenTaskRpcResult> {
-  const db = getServiceRoleClient();
-
-  const { data, error } = await db.rpc('reopen_task', {
+  const { data, error } = await actionResult('reopen_task', {
     p_task_id: taskId,
   });
 
@@ -224,4 +221,8 @@ export async function reopenTaskRpc(
   }
 
   return data as ReopenTaskRpcResult;
+}
+
+async function actionResult(name: string, args: Record<string, unknown>) {
+  return { data: await familyAction(name, args), error: null };
 }

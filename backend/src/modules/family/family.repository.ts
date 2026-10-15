@@ -1,3 +1,4 @@
+import { familyAction } from '../access/access.repository.js';
 /**
  * Family repository — the ONLY layer in this module that talks to Supabase.
  *
@@ -20,10 +21,12 @@
  * two-table write additionally has to be a single transaction, which the
  * `SECURITY DEFINER` RPC provides; the user-scoped client cannot express that.
  */
-import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { getServiceRoleClient } from '../../config/supabase.js';
-import type { FamilyRow, ResponsibleUserRow } from '../../shared/types/index.js';
+import type {
+  FamilyRow,
+  ResponsibleUserRow,
+} from '../../shared/types/index.js';
 import type { FamilyUpdateInput } from './family.schemas.js';
 
 /** Columns selected for a family row. */
@@ -100,9 +103,7 @@ export async function updateFamilyAtomic(
   responsibleUserId: string,
   patch: FamilyUpdateInput,
 ): Promise<void> {
-  const db: SupabaseClient = getServiceRoleClient();
-
-  const { error } = await db.rpc('update_family', {
+  const { error } = await actionResult('update_family', {
     p_family_id: familyId,
     p_responsible_user_id: responsibleUserId,
     p_set_name: patch.name !== undefined,
@@ -118,4 +119,8 @@ export async function updateFamilyAtomic(
   if (error) {
     throw error;
   }
+}
+
+async function actionResult(name: string, args: Record<string, unknown>) {
+  return { data: await familyAction(name, args), error: null };
 }

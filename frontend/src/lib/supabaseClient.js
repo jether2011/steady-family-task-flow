@@ -1,8 +1,7 @@
 // Browser-side Supabase client for the Family Task Board frontend.
 //
-// This is the FRONTEND's own Supabase client, used purely for Google OAuth
-// session handling (sign in / sign out / session restore) and, later, Realtime
-// subscriptions. It is deliberately separate from the backend's service client.
+// This is the FRONTEND's own Supabase client, used for Google OAuth, email OTP
+// and session handling (sign in / sign out / session restore). It is deliberately separate from the backend's service client.
 //
 // Data access does NOT go through this client — it goes through the typed REST
 // client in `@/api/client` with the Bearer token minted here (DP-1 data-layer
@@ -13,6 +12,7 @@
 //   VITE_SUPABASE_URL       — the project URL, e.g. https://xyz.supabase.co
 //   VITE_SUPABASE_PUBLISHABLE_KEY — the publishable key (safe to ship to the browser)
 
+import { authFetch } from './authTransport';
 import { createClient } from '@supabase/supabase-js';
 
 // Read Vite build-time env without depending on ambient `vite/client` types
@@ -38,13 +38,18 @@ if (!supabaseUrl || !supabasePublishableKey) {
  * complete the OAuth redirect (parsing the token out of the callback URL) so
  * `onAuthStateChange` fires once Google sends the user back.
  */
-export const supabase = createClient(supabaseUrl ?? '', supabasePublishableKey ?? '', {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true,
-    flowType: 'pkce',
+export const supabase = createClient(
+  supabaseUrl ?? '',
+  supabasePublishableKey ?? '',
+  {
+    global: { fetch: authFetch },
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      flowType: 'pkce',
+    },
   },
-});
+);
 
 export default supabase;

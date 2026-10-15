@@ -79,6 +79,7 @@ The schema lives in `src/supabase/migrations/` as plain SQL, applied in numeric 
 | `004_functions.sql` | Atomic `complete_task` / `reopen_task` / `redeem_award` + `updated_at` trigger |
 | `005_realtime.sql` | Adds tables to the `supabase_realtime` publication |
 | `006_update_family.sql` | Atomic family/responsible-user update function |
+| `007_membership_access.sql` | Canonical identities, owner backfill, memberships, transactional authorization and role policies |
 | `seed.sql` | Idempotent demo family data |
 
 Apply them with any of these:
@@ -92,7 +93,7 @@ for f in src/supabase/migrations/0*.sql; do psql "$DATABASE_URL" -f "$f"; done
 psql "$DATABASE_URL" -f src/supabase/seed.sql    # optional demo data
 ```
 
-Migrations and `seed.sql` are idempotent, so re-running them is safe.
+Apply migrations once in order using a migration ledger. Migration 007 is intentionally applied once and aborts on identity collisions. The demo seed remains idempotent. See [membership rollout](../docs/implementation/01-membership-rollout.md).
 
 ## API routes
 

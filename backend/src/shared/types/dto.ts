@@ -44,10 +44,26 @@ export interface ResponsibleUserDTO {
 }
 
 /** `GET /me` bootstrap payload (creates the family if absent, R1.4). */
-export interface MePayload {
-  family: FamilyDTO;
-  responsibleUser: ResponsibleUserDTO;
-}
+export type MePayload = {
+  user: { id: string; displayName: string | null; avatarUrl: string | null };
+  capabilities: string[];
+} & (
+  | {
+      state: 'NO_ACCESS' | 'REVOKED';
+      family: null;
+      membership: null;
+    }
+  | {
+      state: 'READY' | 'ONBOARDING_REQUIRED' | 'PAYMENT_REQUIRED';
+      family: FamilyDTO;
+      membership: {
+        id: string;
+        role: 'OWNER' | 'MANAGER' | 'MEMBER';
+        memberId: string | null;
+        accessVersion: number;
+      };
+    }
+);
 
 /** A family member as returned in `{ members: Member[] }`. */
 export interface MemberDTO {
@@ -69,7 +85,8 @@ export interface TaskDTO {
   title: string;
   description: string | null;
   assigned_member_id: string | null;
-  created_by_user_id: string;
+  created_by_user_id: string | null;
+  created_by_app_user_id?: string;
   status: TaskStatus;
   priority: Priority;
   points: number;

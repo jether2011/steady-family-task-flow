@@ -11,6 +11,8 @@
  * Business routes, auth, and context middleware are intentionally absent — this is
  * the skeleton the rest of the backend is assembled onto.
  */
+import { registerRequestScope } from './modules/access/access.store.js';
+import { accessRoutes } from './modules/access/access.routes.js';
 import Fastify, { type FastifyInstance } from 'fastify';
 import cors, { type FastifyCorsOptions } from '@fastify/cors';
 import {
@@ -42,10 +44,10 @@ import { registerErrorHandler } from './middleware/error-handler.js';
 // (JWKS) and attaches the verified `sub` to `request.authUserId` (R1.2/R1.3/R1.7).
 import { registerAuthentication } from './middleware/authentication.js';
 // `src/middleware/context.ts` (task 4.1) resolves auth.uid() → responsible_user →
-// family and attaches `request.ctx` (R23.2); it never creates the family.
+// membership and attaches `request.ctx`; it never creates the family.
 import { registerContext } from './middleware/context.js';
 // `src/modules/auth/auth.routes.ts` (task 4.2) registers `GET /me`, the first-
-// login bootstrap that creates exactly one family per responsible user (R1.4).
+// access resolution returning role/state without creating a family.
 import { authRoutes } from './modules/auth/auth.routes.js';
 // `src/modules/family/family.routes.ts` (task 5.1) registers `GET`/`PATCH
 // /api/v1/family`: the composed family DTO read and the two-table atomic update
@@ -109,7 +111,9 @@ export interface CorsConfig {
  * Exported (with an injectable `config`, defaulting to the frozen `env`) solely
  * so the security suite can assert the wildcard-stripping behaviour directly.
  */
-export function resolveCorsOrigin(config: CorsConfig = env): string[] | boolean {
+export function resolveCorsOrigin(
+  config: CorsConfig = env,
+): string[] | boolean {
   if (config.NODE_ENV === 'production') {
     return config.corsOrigins.filter((origin) => origin !== '*');
   }
@@ -125,6 +129,28 @@ export function buildApp(): FastifyInstance {
     logger: loggerOptions,
   }).withTypeProvider<ZodTypeProvider>();
 
+  app.addHook('preSerialization', (request, _reply, payload, done) => {
+    if (request.ctx?.role !== 'MEMBER') return done(null, payload);
+    const stripActors = (value: unknown): unknown => {
+      if (Array.isArray(value)) return value.map(stripActors);
+      if (value && typeof value === 'object')
+        return Object.fromEntries(
+          Object.entries(value)
+            .filter(
+              ([key]) =>
+                ![
+                  'created_by_user_id',
+                  'created_by_app_user_id',
+                  'completed_by_user_id',
+                  'completed_by_app_user_id',
+                ].includes(key),
+            )
+            .map(([key, item]) => [key, stripActors(item)]),
+        );
+      return value;
+    };
+    done(null, stripActors(payload));
+  });
   // Validate/serialize request & response schemas with Zod.
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
@@ -192,6 +218,7 @@ function registerRoutes(app: FastifyInstance): void {
       // Encapsulated scope: hooks added here apply only to routes registered on
       // `apiV1` (and its children), never to the public ops/docs probes mounted
       // separately in `buildApp()`.
+      registerRequestScope(apiV1);
       registerAuthentication(apiV1); // preHandler: verify JWT → request.authUserId
       registerContext(apiV1); //        preHandler: resolve → request.ctx
 
@@ -199,6 +226,7 @@ function registerRoutes(app: FastifyInstance): void {
       // behind the identity pipeline; it deliberately does NOT require an
       // already-bootstrapped family and creates one on first login (R1.4).
       authRoutes(apiV1);
+      accessRoutes(apiV1);
 
       // Family: `GET`/`PATCH /api/v1/family` (task 5.1). Reads the composed
       // family DTO and routes a flat partial update to `families` +

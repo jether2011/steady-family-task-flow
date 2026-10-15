@@ -74,6 +74,8 @@ const REDACT_PATHS: readonly string[] = [
   'service_role',
   'service_role_key',
   'serviceRoleKey',
+  'ACCESS_EMAIL_DELIVERY_TOKEN',
+  '*.ACCESS_EMAIL_DELIVERY_TOKEN',
   'SUPABASE_SECRET_KEY',
   'SUPABASE_PUBLISHABLE_KEY',
   'SUPABASE_SERVICE_ROLE_KEY',

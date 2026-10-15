@@ -66,6 +66,7 @@ const MIGRATION_FILES = [
   '004_functions.sql',
   '005_realtime.sql',
   '006_update_family.sql',
+  '007_membership_access.sql',
 ] as const;
 
 // The eight application tables (public schema).
@@ -97,6 +98,9 @@ const AUTH_SHIM_SQL = `
   -- lacks them, so create them here (NOLOGIN, like Supabase's own).
   do $$
   begin
+    if not exists (select 1 from pg_roles where rolname = 'anon') then
+      create role anon nologin;
+    end if;
     if not exists (select 1 from pg_roles where rolname = 'authenticated') then
       create role authenticated nologin;
     end if;
@@ -113,6 +117,7 @@ const AUTH_SHIM_SQL = `
     aud text,
     role text,
     email text,
+    email_confirmed_at timestamptz,
     raw_app_meta_data jsonb,
     raw_user_meta_data jsonb,
     created_at timestamptz,

@@ -1,3 +1,4 @@
+import { resourceWrite } from '../access/access.repository.js';
 /**
  * Task repository — the ONLY layer in this module that talks to Supabase.
  *
@@ -35,7 +36,7 @@ import type {
 /** Columns selected for a task row. */
 const TASK_COLUMNS =
   'id, family_id, template_id, title, description, assigned_member_id, ' +
-  'created_by_user_id, status, priority, points, due_date, due_time, ' +
+  'created_by_app_user_id, created_by_user_id, status, priority, points, due_date, due_time, ' +
   'week_start, carried_from_task_id, created_at, updated_at';
 
 /**
@@ -87,8 +88,6 @@ export async function createTask(
   createdByUserId: string,
   input: TaskCreateInput,
 ): Promise<TaskRow> {
-  const db = getServiceRoleClient();
-
   // Build the insert from derived identity + supplied fields only. `priority`
   // is omitted when absent so the column default (MEDIUM) applies; `status` is
   // never part of the create body, so the column default (TODO) always applies.
@@ -108,15 +107,14 @@ export async function createTask(
     insert.priority = input.priority;
   }
 
-  const { data, error } = await db
-    .from('tasks')
-    .insert(insert)
-    .select(TASK_COLUMNS)
-    .single<TaskRow>();
-
-  if (error) {
-    throw error;
-  }
+  const written = await resourceWrite<TaskRow>(
+    'tasks',
+    'insert',
+    familyId,
+    null,
+    insert,
+  );
+  const data = written[0]!;
 
   return data;
 }
@@ -163,19 +161,14 @@ export async function updateTask(
   id: string,
   patch: TaskUpdateInput,
 ): Promise<TaskRow> {
-  const db = getServiceRoleClient();
-
-  const { data, error } = await db
-    .from('tasks')
-    .update(patch)
-    .eq('id', id)
-    .eq('family_id', familyId)
-    .select(TASK_COLUMNS)
-    .single<TaskRow>();
-
-  if (error) {
-    throw error;
-  }
+  const written = await resourceWrite<TaskRow>(
+    'tasks',
+    'update',
+    familyId,
+    id,
+    patch,
+  );
+  const data = written[0]!;
 
   return data;
 }
@@ -245,19 +238,14 @@ export async function moveTask(
   id: string,
   status: TaskStatus,
 ): Promise<TaskRow> {
-  const db = getServiceRoleClient();
-
-  const { data, error } = await db
-    .from('tasks')
-    .update({ status })
-    .eq('id', id)
-    .eq('family_id', familyId)
-    .select(TASK_COLUMNS)
-    .single<TaskRow>();
-
-  if (error) {
-    throw error;
-  }
+  const written = await resourceWrite<TaskRow>(
+    'tasks',
+    'update',
+    familyId,
+    id,
+    { status },
+  );
+  const data = written[0]!;
 
   return data;
 }
@@ -301,7 +289,9 @@ export async function findCarryOverCandidates(
     .neq('status', 'DONE');
 
   if (target.kind === 'week') {
-    query = query.not('week_start', 'is', null).lt('week_start', target.targetWeekStart);
+    query = query
+      .not('week_start', 'is', null)
+      .lt('week_start', target.targetWeekStart);
   } else {
     query = query.not('due_date', 'is', null).lt('due_date', target.targetDate);
   }
@@ -336,11 +326,10 @@ export async function findAlreadyCarried(
   target: CarryOverTarget,
   originIds: string[],
 ): Promise<Set<string>> {
+  const db = getServiceRoleClient();
   if (originIds.length === 0) {
     return new Set();
   }
-
-  const db = getServiceRoleClient();
 
   let query = db
     .from('tasks')
@@ -354,7 +343,8 @@ export async function findAlreadyCarried(
     query = query.eq('due_date', target.targetDate);
   }
 
-  const { data, error } = await query.returns<{ carried_from_task_id: string | null }[]>();
+  const { data, error } =
+    await query.returns<{ carried_from_task_id: string | null }[]>();
 
   if (error) {
     throw error;
@@ -399,17 +389,14 @@ export async function insertCarriedTasks(
     return [];
   }
 
-  const db = getServiceRoleClient();
-
-  const { data, error } = await db
-    .from('tasks')
-    .insert(rows)
-    .select(TASK_COLUMNS)
-    .returns<TaskRow[]>();
-
-  if (error) {
-    throw error;
-  }
+  const written = await resourceWrite<TaskRow>(
+    'tasks',
+    'insert',
+    rows[0]!.family_id,
+    null,
+    rows,
+  );
+  const data = written;
 
   return data ?? [];
 }
@@ -424,15 +411,5 @@ export async function insertCarriedTasks(
  * @param id       The task id to delete.
  */
 export async function deleteTask(familyId: string, id: string): Promise<void> {
-  const db = getServiceRoleClient();
-
-  const { error } = await db
-    .from('tasks')
-    .delete()
-    .eq('id', id)
-    .eq('family_id', familyId);
-
-  if (error) {
-    throw error;
-  }
+  await resourceWrite<TaskRow>('tasks', 'delete', familyId, id, {});
 }

@@ -23,7 +23,10 @@
  */
 import { z } from 'zod';
 
-import { PRIORITY_VALUES, TASK_STATUS_VALUES } from '../../shared/constants/index.js';
+import {
+  PRIORITY_VALUES,
+  TASK_STATUS_VALUES,
+} from '../../shared/constants/index.js';
 
 /**
  * `POST /api/v1/family/tasks` request body.
@@ -101,7 +104,8 @@ export const TaskDTOSchema = z.object({
   title: z.string(),
   description: z.string().nullable(),
   assigned_member_id: z.string().uuid().nullable(),
-  created_by_user_id: z.string().uuid(),
+  created_by_user_id: z.string().uuid().nullable().optional(),
+  created_by_app_user_id: z.string().uuid().optional(),
   status: z.enum(TASK_STATUS_VALUES),
   priority: z.enum(PRIORITY_VALUES),
   points: z.number().int(),

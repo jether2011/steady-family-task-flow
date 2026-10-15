@@ -25,6 +25,22 @@ import { z } from 'zod';
  *   Set it only to point verification at a non-default JWKS location.
  */
 const envSchema = z.object({
+  MEMBERSHIP_ACCESS_ENABLED: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((v) => v === 'true'),
+  ACCESS_EMAIL_DELIVERY_URL: z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z.url().startsWith('https://').optional(),
+  ),
+  ACCESS_EMAIL_DELIVERY_TOKEN: z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z.string().min(1).optional(),
+  ),
+  PUBLIC_APP_URL: z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z.url().optional(),
+  ),
   PORT: z.coerce.number().int().positive().default(8080),
   NODE_ENV: z
     .enum(['development', 'test', 'production'])
@@ -59,9 +75,7 @@ const SECRET_KEYS = new Set([
 function formatIssues(error: z.ZodError): string {
   const lines = error.issues.map((issue) => {
     const key = issue.path.length > 0 ? String(issue.path[0]) : '(root)';
-    const reason = SECRET_KEYS.has(key)
-      ? issue.message
-      : `${issue.message}`;
+    const reason = SECRET_KEYS.has(key) ? issue.message : `${issue.message}`;
     return `  - ${key}: ${reason}`;
   });
   return `Invalid environment configuration:\n${lines.join('\n')}`;

@@ -28,8 +28,8 @@
 -- (first login) or the Admin API instead; if the privileged seed cannot write
 -- to `auth.users` there, the demo auth insert will simply be skipped by the
 -- same conflict/row-exists semantics once a real auth user with this UUID
--- already exists. The real app path remains R1.4 (family auto-created on first
--- `GET /api/v1/me`); this seed is a dev/demo convenience only.
+-- already exists. This seed is a dev/demo convenience only; /me never creates
+-- a family. Apply migrations 001 through 007 before running this file.
 --
 -- Stable demo UUIDs (documented here so they can be reused by tests/tools):
 --   auth user / responsible user ... see constants below
@@ -46,6 +46,7 @@ insert into auth.users (
   aud,
   role,
   email,
+  email_confirmed_at,
   raw_app_meta_data,
   raw_user_meta_data,
   created_at,
@@ -57,6 +58,7 @@ values (
   'authenticated',
   'authenticated',
   'jether.rodrigues@example.com',
+  now(),
   '{"provider":"google","providers":["google"]}'::jsonb,
   '{"full_name":"Jether Rodrigues"}'::jsonb,
   now(),
@@ -83,6 +85,15 @@ values (
   'Rodrigues Family'
 )
 on conflict (id) do nothing;
+
+-- Canonical owner identity and membership (after migration 007).
+insert into app_users (id, auth_user_id, display_name)
+values ('0b000000-0000-4000-8000-000000000001', '0a000000-0000-4000-8000-000000000001', 'Jether Rodrigues')
+on conflict (auth_user_id) do nothing;
+insert into family_memberships (family_id, app_user_id, role, status, login_email, normalized_email)
+select '1b000000-0000-4000-8000-000000000001', id, 'OWNER', 'ACTIVE', 'jether.rodrigues@example.com', 'jether.rodrigues@example.com'
+from app_users where auth_user_id='0a000000-0000-4000-8000-000000000001'
+on conflict (app_user_id) do nothing;
 
 -- 4) Family members: Ana (PARENT), Lucas (CHILD), Marina (CHILD), Pedro (DEPENDENT).
 insert into family_members (id, family_id, name, member_type, active)
@@ -116,16 +127,16 @@ on conflict (id) do nothing;
 --      Water plants  -> Pedro  (10)
 --      Wash dishes   -> Ana    (15)
 insert into tasks (
-  id, family_id, template_id, title, assigned_member_id, created_by_user_id,
+  id, family_id, template_id, title, assigned_member_id, created_by_user_id, created_by_app_user_id,
   status, priority, points, due_date, week_start
 )
 values
-  ('4e000000-0000-4000-8000-000000000001', '1b000000-0000-4000-8000-000000000001', '3d000000-0000-4000-8000-000000000001', 'Make bed',      '2c000000-0000-4000-8000-000000000002', '09000000-0000-4000-8000-000000000001', 'TODO', 'LOW',     5, date '2025-01-06', date '2025-01-06'),
-  ('4e000000-0000-4000-8000-000000000002', '1b000000-0000-4000-8000-000000000001', '3d000000-0000-4000-8000-000000000002', 'Feed dog',      '2c000000-0000-4000-8000-000000000002', '09000000-0000-4000-8000-000000000001', 'TODO', 'MEDIUM', 10, date '2025-01-06', date '2025-01-06'),
-  ('4e000000-0000-4000-8000-000000000003', '1b000000-0000-4000-8000-000000000001', '3d000000-0000-4000-8000-000000000003', 'Homework',      '2c000000-0000-4000-8000-000000000003', '09000000-0000-4000-8000-000000000001', 'TODO', 'HIGH',   15, date '2025-01-06', date '2025-01-06'),
-  ('4e000000-0000-4000-8000-000000000004', '1b000000-0000-4000-8000-000000000001', '3d000000-0000-4000-8000-000000000004', 'Clean bedroom', '2c000000-0000-4000-8000-000000000003', '09000000-0000-4000-8000-000000000001', 'TODO', 'MEDIUM', 20, date '2025-01-06', date '2025-01-06'),
-  ('4e000000-0000-4000-8000-000000000005', '1b000000-0000-4000-8000-000000000001', '3d000000-0000-4000-8000-000000000005', 'Water plants',  '2c000000-0000-4000-8000-000000000004', '09000000-0000-4000-8000-000000000001', 'TODO', 'LOW',    10, date '2025-01-06', date '2025-01-06'),
-  ('4e000000-0000-4000-8000-000000000006', '1b000000-0000-4000-8000-000000000001', '3d000000-0000-4000-8000-000000000006', 'Wash dishes',   '2c000000-0000-4000-8000-000000000001', '09000000-0000-4000-8000-000000000001', 'TODO', 'MEDIUM', 15, date '2025-01-06', date '2025-01-06')
+  ('4e000000-0000-4000-8000-000000000001', '1b000000-0000-4000-8000-000000000001', '3d000000-0000-4000-8000-000000000001', 'Make bed',      '2c000000-0000-4000-8000-000000000002', '09000000-0000-4000-8000-000000000001', (select id from app_users where auth_user_id='0a000000-0000-4000-8000-000000000001'), 'TODO', 'LOW',     5, date '2025-01-06', date '2025-01-06'),
+  ('4e000000-0000-4000-8000-000000000002', '1b000000-0000-4000-8000-000000000001', '3d000000-0000-4000-8000-000000000002', 'Feed dog',      '2c000000-0000-4000-8000-000000000002', '09000000-0000-4000-8000-000000000001', (select id from app_users where auth_user_id='0a000000-0000-4000-8000-000000000001'), 'TODO', 'MEDIUM', 10, date '2025-01-06', date '2025-01-06'),
+  ('4e000000-0000-4000-8000-000000000003', '1b000000-0000-4000-8000-000000000001', '3d000000-0000-4000-8000-000000000003', 'Homework',      '2c000000-0000-4000-8000-000000000003', '09000000-0000-4000-8000-000000000001', (select id from app_users where auth_user_id='0a000000-0000-4000-8000-000000000001'), 'TODO', 'HIGH',   15, date '2025-01-06', date '2025-01-06'),
+  ('4e000000-0000-4000-8000-000000000004', '1b000000-0000-4000-8000-000000000001', '3d000000-0000-4000-8000-000000000004', 'Clean bedroom', '2c000000-0000-4000-8000-000000000003', '09000000-0000-4000-8000-000000000001', (select id from app_users where auth_user_id='0a000000-0000-4000-8000-000000000001'), 'TODO', 'MEDIUM', 20, date '2025-01-06', date '2025-01-06'),
+  ('4e000000-0000-4000-8000-000000000005', '1b000000-0000-4000-8000-000000000001', '3d000000-0000-4000-8000-000000000005', 'Water plants',  '2c000000-0000-4000-8000-000000000004', '09000000-0000-4000-8000-000000000001', (select id from app_users where auth_user_id='0a000000-0000-4000-8000-000000000001'), 'TODO', 'LOW',    10, date '2025-01-06', date '2025-01-06'),
+  ('4e000000-0000-4000-8000-000000000006', '1b000000-0000-4000-8000-000000000001', '3d000000-0000-4000-8000-000000000006', 'Wash dishes',   '2c000000-0000-4000-8000-000000000001', '09000000-0000-4000-8000-000000000001', (select id from app_users where auth_user_id='0a000000-0000-4000-8000-000000000001'), 'TODO', 'MEDIUM', 15, date '2025-01-06', date '2025-01-06')
 on conflict (id) do nothing;
 
 commit;

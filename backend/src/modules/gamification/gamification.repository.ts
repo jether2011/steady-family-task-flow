@@ -1,3 +1,4 @@
+import { resourceWrite, familyAction } from '../access/access.repository.js';
 /**
  * Gamification repository — the ONLY layer in this module that talks to
  * Supabase. Backs the ledger-read + leaderboard slice (task 10.1):
@@ -309,8 +310,6 @@ export async function createAward(
   familyId: string,
   input: AwardCreateInput,
 ): Promise<AwardRow> {
-  const db = getServiceRoleClient();
-
   const insert: Record<string, unknown> = {
     family_id: familyId,
     title: input.title,
@@ -323,15 +322,14 @@ export async function createAward(
     insert.icon = input.icon;
   }
 
-  const { data, error } = await db
-    .from('awards')
-    .insert(insert)
-    .select(AWARD_COLUMNS)
-    .single<AwardRow>();
-
-  if (error) {
-    throw error;
-  }
+  const written = await resourceWrite<AwardRow>(
+    'awards',
+    'insert',
+    familyId,
+    null,
+    insert,
+  );
+  const data = written[0]!;
 
   return data;
 }
@@ -378,19 +376,14 @@ export async function updateAward(
   id: string,
   patch: AwardUpdateInput,
 ): Promise<AwardRow> {
-  const db = getServiceRoleClient();
-
-  const { data, error } = await db
-    .from('awards')
-    .update(patch)
-    .eq('id', id)
-    .eq('family_id', familyId)
-    .select(AWARD_COLUMNS)
-    .single<AwardRow>();
-
-  if (error) {
-    throw error;
-  }
+  const written = await resourceWrite<AwardRow>(
+    'awards',
+    'update',
+    familyId,
+    id,
+    patch,
+  );
+  const data = written[0]!;
 
   return data;
 }
@@ -408,19 +401,14 @@ export async function deactivateAward(
   familyId: string,
   id: string,
 ): Promise<AwardRow> {
-  const db = getServiceRoleClient();
-
-  const { data, error } = await db
-    .from('awards')
-    .update({ active: false })
-    .eq('id', id)
-    .eq('family_id', familyId)
-    .select(AWARD_COLUMNS)
-    .single<AwardRow>();
-
-  if (error) {
-    throw error;
-  }
+  const written = await resourceWrite<AwardRow>(
+    'awards',
+    'update',
+    familyId,
+    id,
+    { active: false },
+  );
+  const data = written[0]!;
 
   return data;
 }
@@ -464,9 +452,7 @@ export async function redeemAwardRpc(
   memberId: string,
   familyId: string,
 ): Promise<PointsTransactionRow> {
-  const db = getServiceRoleClient();
-
-  const { data, error } = await db.rpc('redeem_award', {
+  const { data, error } = await actionResult('redeem_award', {
     p_award_id: awardId,
     p_member_id: memberId,
     p_family_id: familyId,
@@ -483,4 +469,8 @@ export async function redeemAwardRpc(
   }
 
   return data as PointsTransactionRow;
+}
+
+async function actionResult(name: string, args: Record<string, unknown>) {
+  return { data: await familyAction(name, args), error: null };
 }
