@@ -7,7 +7,7 @@ import {
   Forbidden,
 } from '../shared/errors/index.js';
 import { resolveMembership } from '../modules/access/access.service.js';
-import { tenantState } from '../modules/tenant/tenant.policy.js';
+import { resolveEntitlement } from '../modules/entitlements/entitlements.service.js';
 import type { RequestContext } from './types.js';
 import './types.js';
 export async function resolveContext(
@@ -62,20 +62,6 @@ export async function contextHook(request: FastifyRequest) {
     if (ctx.role !== 'OWNER') throw new Forbidden();
     return;
   }
-  const { data: tenant, error } = await getServiceRoleClient()
-    .from('families')
-    .select(
-      'lifecycle,creation_source,legacy_access_eligible,profile_completed_at',
-    )
-    .eq('id', ctx.familyId!)
-    .single();
-  if (error) throw error;
-  if (tenantState(tenant) !== 'READY')
-    throw new AppError(
-      'TENANT_ACCESS_RESTRICTED',
-      403,
-      'Complete family onboarding before opening the dashboard',
-    );
   if (ctx.role === 'MEMBER') {
     const allowed = new Set([
       '/api/v1/family',
@@ -103,6 +89,26 @@ export async function contextHook(request: FastifyRequest) {
       query.memberId = ctx.memberId!;
     }
   }
+  const securityRevoke =
+    url === '/api/v1/family/members/:id/access/revoke' &&
+    request.method === 'POST';
+  if (securityRevoke && ['OWNER', 'MANAGER'].includes(ctx.role ?? '')) return;
+  const entitlement = await resolveEntitlement(
+    request.authUserId,
+    ctx.familyId!,
+  );
+  if (!entitlement.canRead)
+    throw new AppError(
+      'SUBSCRIPTION_REQUIRED',
+      403,
+      'Family access requires subscription setup',
+    );
+  if (!['GET', 'HEAD'].includes(request.method) && !entitlement.canWrite)
+    throw new AppError(
+      'SUBSCRIPTION_REQUIRED',
+      403,
+      'Your family currently has view-only access',
+    );
 }
 export function requireFamilyContext(request: FastifyRequest) {
   const ctx = request.ctx;

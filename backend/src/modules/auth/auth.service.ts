@@ -1,4 +1,4 @@
-import { tenantState } from '../tenant/tenant.policy.js';
+import { resolveEntitlement } from '../entitlements/entitlements.service.js';
 import { env } from '../../config/env.js';
 import { accessRpc } from '../access/access.repository.js';
 import {
@@ -51,9 +51,21 @@ export async function bootstrapMe(
     m.family_id,
     household.responsible_user_id,
   );
-  const state = tenantState(household);
+  const entitlement = await resolveEntitlement(authUserId, m.family_id);
+  const state = !household.profile_completed_at
+    ? 'ONBOARDING_REQUIRED'
+    : entitlement.canRead
+      ? 'READY'
+      : 'PAYMENT_REQUIRED';
   return {
     state,
+    access: {
+      state: entitlement.state,
+      reason: entitlement.reason,
+      effectiveUntil: entitlement.effectiveUntil,
+      version: entitlement.version,
+      canManageBilling: m.role === 'OWNER',
+    },
     user,
     family: {
       id: family.id,
@@ -71,7 +83,7 @@ export async function bootstrapMe(
     capabilities:
       state !== 'READY'
         ? m.role === 'OWNER'
-          ? ['owner:onboarding']
+          ? ['owner:onboarding', 'billing:manage']
           : []
         : m.role === 'MEMBER'
           ? [
@@ -84,13 +96,22 @@ export async function bootstrapMe(
             ]
           : [
               'family:read',
-              'family:manage',
-              'members:manage',
-              'tasks:manage',
-              'templates:manage',
+              'members:read',
+              'templates:read',
+              'members:security-revoke',
+              ...(entitlement.canWrite
+                ? [
+                    'family:manage',
+                    'members:manage',
+                    'tasks:manage',
+                    'templates:manage',
+                    'awards:manage',
+                  ]
+                : []),
               'points:all',
-              'awards:manage',
-              ...(m.role === 'OWNER' ? ['owner:onboarding'] : []),
+              ...(m.role === 'OWNER'
+                ? ['owner:onboarding', 'billing:manage']
+                : []),
             ],
   };
 }

@@ -1,3 +1,4 @@
+import { useScope } from '@/hooks/useScope';
 import React, { useState, useEffect } from 'react';
 import {
   useFamily,
@@ -36,6 +37,11 @@ import { cn } from '@/lib/utils';
 const RELATIONSHIPS = ['FATHER', 'MOTHER', 'GUARDIAN', 'OTHER'];
 
 export default function Settings() {
+  const scope = useScope();
+  return scope.canManage === false ? <ReadOnlySettings /> : <ManagementSettings />;
+}
+
+function ManagementSettings() {
   const { data: family } = useFamily();
   const { data: members } = useMembers();
   const { data: templates, isLoading: tplLoading } = useTemplates();
@@ -234,5 +240,20 @@ export default function Settings() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+function ReadOnlySettings() {
+  const { data: family } = useFamily();
+  return (
+    <main className="p-8 space-y-4">
+      <h1 className="text-2xl font-bold">Family settings</h1>
+      <p>Your family currently has view-only access.</p>
+      <dl>
+        <dt>Family name</dt>
+        <dd>{family?.name}</dd>
+        <dt>Responsible name</dt>
+        <dd>{family?.responsible_name}</dd>
+      </dl>
+    </main>
   );
 }

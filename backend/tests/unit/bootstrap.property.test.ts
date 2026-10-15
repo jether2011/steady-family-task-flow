@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   load: vi.fn(),
   single: vi.fn(),
 }));
+vi.mock('../../src/modules/entitlements/entitlements.service.js',()=>({resolveEntitlement:async()=>{const row=(await mocks.single()).data;const ready=row.lifecycle==='ESTABLISHED' && row.creation_source==='LEGACY' && row.legacy_access_eligible && !!row.profile_completed_at;return {state:ready?'LEGACY':'DRAFT',reason:ready?'LEGACY':'PAYMENT_PENDING',effectiveUntil:null,version:100,canRead:ready,canWrite:ready,ownerDeadlines:null};}}));
 vi.mock('../../src/modules/access/access.service.js', () => ({
   resolveMembership: mocks.resolve,
 }));
@@ -131,7 +132,7 @@ describe('tenant bootstrap lifecycle', () => {
       const result = await bootstrapMe('auth', {});
       expect(result.state).toBe(expected);
       if (expected !== 'READY')
-        expect(result.capabilities).toEqual(['owner:onboarding']);
+        expect(result.capabilities).toEqual(['owner:onboarding','billing:manage']);
     },
   );
 });

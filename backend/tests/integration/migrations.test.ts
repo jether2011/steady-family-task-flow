@@ -70,6 +70,7 @@ const MIGRATION_FILES = [
   '008_member_views.sql',
   '009_tenant_onboarding.sql',
   '010_stripe_billing.sql',
+  '011_subscription_entitlements.sql',
 ] as const;
 
 // The eight application tables (public schema).

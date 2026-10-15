@@ -28,7 +28,7 @@ import { cn } from '@/lib/utils';
 
 export default function FamilyAwards() {
   const scope = useScope();
-  return scope.role === 'MEMBER' ? (
+  return scope.role === 'MEMBER' || scope.canManage === false ? (
     <MemberCatalog />
   ) : (
     <ManagementFamilyAwards />

@@ -1,3 +1,4 @@
+vi.mock('../../src/modules/entitlements/entitlements.service.js',()=>({resolveEntitlement:async()=>({state:'LEGACY',reason:'LEGACY',effectiveUntil:null,version:130,canRead:true,canWrite:true,canManageBilling:false,ownerDeadlines:null})}));
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Fastify from 'fastify';
 import {

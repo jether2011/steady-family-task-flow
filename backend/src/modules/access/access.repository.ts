@@ -2,6 +2,13 @@ import { getServiceRoleClient } from '../../config/supabase.js';
 import { AppError } from '../../shared/errors/index.js';
 import { mutationIdentity } from './access.store.js';
 const errors: Record<string, number> = {
+  ENTITLEMENT_UNAVAILABLE: 503,
+  SUBSCRIPTION_REQUIRED: 403,
+  MEMBER_LIMIT_REACHED: 422,
+  ENTITLEMENT_FENCE_LOST: 409,
+  POLICY_CONFIGURATION_REQUIRED: 503,
+  POLICY_VERSION_CONFLICT: 409,
+
   SUBSCRIPTION_EXISTS: 409,
   PLAN_UNAVAILABLE: 422,
   BILLING_UNAVAILABLE: 503,

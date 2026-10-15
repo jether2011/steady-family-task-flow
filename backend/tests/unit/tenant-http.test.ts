@@ -24,6 +24,7 @@ const h = vi.hoisted(() => ({
     profile_completed_at: '2026-10-01',
   },
 }));
+vi.mock('../../src/modules/entitlements/entitlements.service.js',()=>({resolveEntitlement:async()=>{const ready=h.tenant.lifecycle==='ESTABLISHED' && h.tenant.creation_source==='LEGACY' && h.tenant.legacy_access_eligible;return{state:ready?'LEGACY':'DRAFT',reason:ready?'LEGACY':'PAYMENT_PENDING',effectiveUntil:null,version:100,canRead:ready,canWrite:ready,ownerDeadlines:null};}}));
 vi.mock('../../src/modules/access/access.service.js', () => ({
   verifiedIdentity: h.identity,
   resolveMembership: async () => ({
@@ -282,7 +283,7 @@ describe('tenant HTTP contracts and lifecycle boundary', () => {
           headers: headers(),
         });
         expect(res.statusCode).toBe(403);
-        expect(res.json().error.code).toBe('TENANT_ACCESS_RESTRICTED');
+        expect(res.json().error.code).toBe(role==='MEMBER' && method!=='GET'?'FORBIDDEN':'SUBSCRIPTION_REQUIRED');
       }
     },
   );

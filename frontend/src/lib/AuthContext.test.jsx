@@ -531,3 +531,12 @@ describe('removed email/password + consent pages are gone (R1.8)', () => {
     expect(appSource).not.toMatch(/path=["']\/oauth-consent["']/);
   });
 });
+
+it('clears editable cache when entitlement changes without changing membership role/version',async()=>{
+ setSession(AUTHENTICATED_SESSION);let value;
+ meMock.mockResolvedValueOnce({state:'READY',user:{id:'app'},family:{id:'family'},membership:{role:'OWNER',accessVersion:1},access:{state:'ACTIVE',version:210},capabilities:['family:manage']});
+ const Probe=()=>{value=useAuth();return null;};render(<AuthProvider><Probe/></AuthProvider>);await waitFor(()=>expect(value?.access?.access?.version).toBe(210));
+ queryClientInstance.setQueryData(['editable-cache'],{status:'editable'});
+ meMock.mockResolvedValueOnce({state:'READY',user:{id:'app'},family:{id:'family'},membership:{role:'OWNER',accessVersion:1},access:{state:'READ_ONLY',version:290},capabilities:['members:read']});
+ await act(async()=>{await value.retryAccessResolution();});expect(value.access.access.version).toBe(290);expect(queryClientInstance.getQueryData(['editable-cache'])).toBeUndefined();expect(signInWithOAuth).not.toHaveBeenCalled();
+});

@@ -47,6 +47,9 @@ export default function AccessStatus() {
       {state === 'NO_ACCESS' && auth.access?.signupAvailable && (
         <Link to="/create-family">Create a family</Link>
       )}
+      {auth.authError?.code === 'ENTITLEMENT_UNAVAILABLE' && (
+        <Link to="/billing">Owner billing recovery</Link>
+      )}
       <div className="flex gap-4">
         <button onClick={auth.retryAccessResolution}>Retry access</button>
         <button onClick={auth.logout}>Change account</button>

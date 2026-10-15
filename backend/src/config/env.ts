@@ -29,6 +29,33 @@ const optionalBillingString = z.preprocess(
   z.string().min(1).optional(),
 );
 const envSchema = z.object({
+  ENTITLEMENT_ENFORCEMENT_ENABLED: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((v) => v === 'true'),
+  ENTITLEMENT_TRIALS_ENABLED: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((v) => v === 'true'),
+  ENTITLEMENT_POLICY_VERSION: optionalBillingString,
+  ENTITLEMENT_POLICY_APPROVAL: optionalBillingString,
+  RENEWAL_GRACE_DAYS: z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z.coerce.number().int().min(0).max(90).optional(),
+  ),
+  PROVIDER_OUTAGE_TOLERANCE_HOURS: z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z.coerce.number().int().min(0).max(168).optional(),
+  ),
+  LEGACY_ENTITLEMENT_DEADLINE: z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z.iso.datetime({ offset: true }).optional(),
+  ),
+  ENTITLEMENT_EXCEPTION_POLICY: z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z.literal('RESTRICT').optional(),
+  ),
+
   CHECKOUT_ENABLED: z
     .enum(['true', 'false'])
     .default('false')
@@ -237,6 +264,35 @@ export function parseEnv(source: NodeJS.ProcessEnv = process.env): Env {
     throw new Error(
       'Invalid environment configuration: BILLING_PAYMENT_METHODS currently supports approved card-only automatic collection',
     );
+  if (
+    billing.CHECKOUT_ENABLED ||
+    billing.ENTITLEMENT_ENFORCEMENT_ENABLED ||
+    billing.ENTITLEMENT_TRIALS_ENABLED ||
+    billing.ENTITLEMENT_POLICY_VERSION
+  ) {
+    const keys = [
+      'ENTITLEMENT_POLICY_VERSION',
+      'ENTITLEMENT_POLICY_APPROVAL',
+      'RENEWAL_GRACE_DAYS',
+      'PROVIDER_OUTAGE_TOLERANCE_HOURS',
+      'ENTITLEMENT_EXCEPTION_POLICY',
+      'STRIPE_ACCOUNT_ID',
+      'STRIPE_PRICE_ID',
+      'BILLING_MEMBER_LIMIT',
+    ] as const;
+    const missing = keys.filter((k) => billing[k] === undefined);
+    if (missing.length)
+      throw new Error(
+        'Invalid environment configuration: missing ' + missing.join(', '),
+      );
+    if (
+      billing.ENTITLEMENT_ENFORCEMENT_ENABLED &&
+      !billing.LEGACY_ENTITLEMENT_DEADLINE
+    )
+      throw new Error(
+        'Invalid environment configuration: LEGACY_ENTITLEMENT_DEADLINE is required for enforcement',
+      );
+  }
   const corsOrigins = result.data.CORS_ORIGIN.split(',')
     .map((origin) => origin.trim())
     .filter((origin) => origin.length > 0);

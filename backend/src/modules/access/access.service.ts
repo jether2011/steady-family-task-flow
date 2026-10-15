@@ -179,3 +179,17 @@ export async function confirmEmailChange(
     p_correlation: correlation,
   });
 }
+
+export async function securityRevoke(
+  memberId: string,
+  expectedVersion: number,
+) {
+  const actor = mutationIdentity();
+  return accessRpc<MembershipRow>('security_revoke_access', {
+    p_auth: actor.auth,
+    p_family: actor.family,
+    p_member: memberId,
+    p_version: expectedVersion,
+    p_correlation: actor.correlation,
+  });
+}

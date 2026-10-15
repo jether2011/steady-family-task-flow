@@ -243,6 +243,19 @@ async function snapshots(
         attempt.session_id,
       'SUBSCRIPTION_LINK_MISMATCH',
     );
+    assertBilling(
+      [
+        'active',
+        'past_due',
+        'canceled',
+        'unpaid',
+        'paused',
+        'incomplete',
+        'incomplete_expired',
+        'trialing',
+      ].includes(sub.status),
+      'UNKNOWN_PROVIDER_STATUS',
+    );
     const item = sub.items.data[0];
     assertBilling(
       item &&
@@ -253,7 +266,8 @@ async function snapshots(
         sub.collection_method === 'charge_automatically',
       'SUBSCRIPTION_PRICE_MISMATCH',
     );
-    if (sub.trial_end || sub.status === 'trialing') alert = 'UNAPPROVED_TRIAL';
+    if (sub.status === 'trialing' && !env.ENTITLEMENT_TRIALS_ENABLED)
+      alert = 'UNAPPROVED_TRIAL';
     const latestId = refId(sub.latest_invoice);
     const latest = latestId ? await stripe.invoices.retrieve(latestId) : null;
     const paid = await stripe.invoices.list({

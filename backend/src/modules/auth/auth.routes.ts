@@ -51,6 +51,30 @@ export const MePayloadSchema = z.discriminatedUnion('state', [
   }),
   z.object({
     state: z.enum(['READY', 'ONBOARDING_REQUIRED', 'PAYMENT_REQUIRED']),
+    access: z
+      .object({
+        state: z.enum([
+          'DRAFT',
+          'ACTIVE',
+          'TRIAL',
+          'GRACE',
+          'READ_ONLY',
+          'LEGACY',
+        ]),
+        reason: z.enum([
+          'PAYMENT_PENDING',
+          'PAID',
+          'PAYMENT_ISSUE',
+          'EXPIRED',
+          'LEGACY',
+          'TRIAL',
+          'TEMPORARY',
+        ]),
+        effectiveUntil: z.string().nullable(),
+        version: z.number().int(),
+        canManageBilling: z.boolean(),
+      })
+      .optional(),
     user: UserSchema,
     family: FamilyDTOSchema,
     membership: MembershipSchema,

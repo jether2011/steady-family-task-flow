@@ -146,6 +146,18 @@ export default function Billing() {
       {location.search.includes('checkout=canceled') && (
         <p role="status">Checkout canceled. Your family draft is saved.</p>
       )}
+      {auth.authError?.code === 'ENTITLEMENT_UNAVAILABLE' && (
+        <p>
+          Access verification is temporarily unavailable. Existing billing
+          recovery remains available.
+        </p>
+      )}
+      {auth.access?.state === 'ONBOARDING_REQUIRED' && (
+        <p>
+          Complete your <Link to="/onboarding">family profile</Link> before
+          starting a subscription. Existing billing recovery remains available.
+        </p>
+      )}
       {error && <p role="alert">{error}</p>}
       {(plan.error || subscription.error || attempt.error) && (
         <p role="alert">
@@ -253,12 +265,39 @@ export default function Billing() {
           Billing needs support review before another checkout can start.
         </p>
       )}
+      {s?.entitlement && (
+        <section className="space-y-2" aria-label="Family access deadlines">
+          <p>
+            Family access:{' '}
+            {s.entitlement.state.replaceAll('_', ' ').toLowerCase()}
+          </p>
+          {[
+            ['legacyEndsAt', 'Legacy access deadline'],
+            ['graceEndsAt', 'Payment recovery deadline'],
+            ['trialEndsAt', 'Trial deadline'],
+          ].map(([key, label]) => {
+            const value = s.entitlement.ownerDeadlines?.[key];
+            return typeof value === 'string' ? (
+              <p key={key}>
+                {label}: {new Date(value).toLocaleString()}
+              </p>
+            ) : null;
+          })}
+        </section>
+      )}
       <div className="flex flex-wrap gap-3">
-        {!isReturn && p?.available && s?.recoveryAction === 'SUBSCRIBE' && (
-          <Button disabled={busy || subscription.isPending} onClick={purchase}>
-            Subscribe monthly
-          </Button>
-        )}
+        {!isReturn &&
+          !auth.authError &&
+          auth.access?.state !== 'ONBOARDING_REQUIRED' &&
+          p?.available &&
+          s?.recoveryAction === 'SUBSCRIBE' && (
+            <Button
+              disabled={busy || subscription.isPending}
+              onClick={purchase}
+            >
+              Subscribe monthly
+            </Button>
+          )}
         {!isReturn && s?.recoveryAction === 'RESUME_CHECKOUT' && t?.url && (
           <Button disabled={busy} onClick={() => leave(t.url, 'checkout')}>
             Resume checkout

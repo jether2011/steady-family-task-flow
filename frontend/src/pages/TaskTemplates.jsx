@@ -1,3 +1,4 @@
+import { useScope } from '@/hooks/useScope';
 import React, { useState, useMemo } from 'react';
 import { useFamily, useMembers, useTemplates, useDeleteTemplate } from '@/hooks/useFamily';
 import { RECURRENCE_LABELS, PRIORITY_LABELS, PRIORITY_STYLES, WEEKDAY_LABELS } from '@/lib/familyUtils';
@@ -19,6 +20,11 @@ import {
 import { cn } from '@/lib/utils';
 
 export default function TaskTemplates() {
+  const scope = useScope();
+  return scope.canManage === false ? <ReadOnlyTaskTemplates /> : <ManagementTaskTemplates />;
+}
+
+function ManagementTaskTemplates() {
   const { data: family } = useFamily();
   const { data: members } = useMembers();
   const { data: templates, isLoading } = useTemplates();
@@ -173,5 +179,25 @@ export default function TaskTemplates() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+function ReadOnlyTaskTemplates() {
+  const { data: templates, isLoading } = useTemplates();
+  return (
+    <main className="p-8 space-y-4">
+      <h1 className="text-2xl font-bold">Task templates</h1>
+      <p>Your family currently has view-only access.</p>
+      {isLoading ? (
+        <p role="status">Loading templates…</p>
+      ) : (
+        <ul>
+          {templates?.map((t) => (
+            <li key={t.id} className="border rounded p-4">
+              {t.title} · {t.points} points
+            </li>
+          ))}
+        </ul>
+      )}
+    </main>
   );
 }

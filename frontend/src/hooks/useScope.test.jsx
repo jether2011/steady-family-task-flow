@@ -69,6 +69,7 @@ describe('query scope follows trusted access state', () => {
       'family',
       'OWNER',
       1,
+      null,
       'points',
     ]);
     state.auth = auth('MEMBER', 2);
@@ -84,6 +85,7 @@ describe('query scope follows trusted access state', () => {
       'family',
       'MEMBER',
       2,
+      null,
       'points',
     ]);
   });
@@ -95,4 +97,11 @@ describe('query scope follows trusted access state', () => {
     expect(state.points).not.toHaveBeenCalled();
     expect(state.members).not.toHaveBeenCalled();
   });
+ it('changes cache scope at an entitlement boundary while retaining manager read privacy',async()=>{
+  state.auth.access.access={state:'ACTIVE',version:210};const view=setup();await waitFor(()=>expect(view.result.current.members.data).toHaveLength(1));const oldKey=view.result.current.scope.key('tasks');
+  state.auth={...state.auth,access:{...state.auth.access,capabilities:['members:read','members:security-revoke','points:all'],access:{state:'READ_ONLY',version:290}}};view.rerender();
+  expect(view.result.current.scope.key('tasks')).not.toEqual(oldKey);expect(view.result.current.scope.canManage).toBe(false);expect(view.result.current.scope.canReadManagement).toBe(true);expect(view.result.current.scope.canRevoke).toBe(true);
+  await waitFor(()=>expect(view.result.current.members.data).toHaveLength(1));
+ });
+
 });

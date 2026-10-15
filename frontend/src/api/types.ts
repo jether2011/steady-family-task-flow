@@ -64,6 +64,7 @@ export interface AccessSummary {
   accessVersion: number;
 }
 export type MePayload = {
+  access?: {state:'DRAFT'|'ACTIVE'|'TRIAL'|'GRACE'|'READ_ONLY'|'LEGACY';reason:'PAYMENT_PENDING'|'PAID'|'PAYMENT_ISSUE'|'EXPIRED'|'LEGACY'|'TRIAL'|'TEMPORARY';effectiveUntil:string|null;version:number;canManageBilling:boolean};
   signupAvailable?: boolean;
   user: { id: string; displayName: string | null; avatarUrl: string | null };
   capabilities: string[];
