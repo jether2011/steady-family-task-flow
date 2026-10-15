@@ -38,7 +38,11 @@ function errMsg(e) {
 
 export default function Board() {
   const scope = useScope();
-  return scope.role === 'MEMBER' ? <MemberBoard /> : <ManagementBoard />;
+  return scope.role === 'MEMBER' || scope.canManage === false ? (
+    <MemberBoard />
+  ) : (
+    <ManagementBoard />
+  );
 }
 function ManagementBoard() {
   const { data: family } = useFamily();

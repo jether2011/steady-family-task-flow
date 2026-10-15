@@ -19,7 +19,9 @@ export default function PointsHistory() {
     [to, setTo] = useState(''),
     [type, setType] = useState('');
   const filter = {
-    ...(scope.canManage && memberId ? { memberId } : {}),
+    ...((scope.canReadManagement ?? scope.canManage) && memberId
+      ? { memberId }
+      : {}),
     ...(from ? { from } : {}),
     ...(to ? { to } : {}),
   };
@@ -33,10 +35,12 @@ export default function PointsHistory() {
   return (
     <div className="p-4 lg:p-8 max-w-4xl mx-auto space-y-6">
       <h1 className="text-3xl font-bold">
-        {scope.canManage ? 'Points history' : 'My points history'}
+        {(scope.canReadManagement ?? scope.canManage)
+          ? 'Points history'
+          : 'My points history'}
       </h1>
       <div className="flex flex-wrap gap-3">
-        {scope.canManage && (
+        {(scope.canReadManagement ?? scope.canManage) && (
           <label>
             Member{' '}
             <select
@@ -114,7 +118,8 @@ export default function PointsHistory() {
                 <div>
                   <p>
                     {labels[row.transaction_type]}{' '}
-                    {scope.canManage && names[row.member_id]
+                    {(scope.canReadManagement ?? scope.canManage) &&
+                    names[row.member_id]
                       ? `· ${names[row.member_id]}`
                       : ''}
                   </p>

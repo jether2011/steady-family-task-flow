@@ -1,3 +1,4 @@
+import EntitlementBanner from '@/components/EntitlementBanner';
 import React from 'react';
 import { NavLink, Outlet, Navigate } from 'react-router-dom';
 import { useFamily } from '@/hooks/useFamily';
@@ -169,7 +170,8 @@ export default function Layout() {
         </header>
 
         <main className="flex-1 overflow-y-auto scrollbar-thin pb-20 lg:pb-0">
-          <Outlet />
+          <EntitlementBanner/>
+        <Outlet />
         </main>
 
         <nav className="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-card/95 backdrop-blur border-t border-border">

@@ -1,3 +1,5 @@
+import { useScope } from '@/hooks/useScope';
+import SecurityRevokeButton from '@/components/members/SecurityRevokeButton';
 import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -27,6 +29,7 @@ import {
 import { cn } from '@/lib/utils';
 
 export default function Members() {
+  const scope = useScope();
   const { data: family } = useFamily();
   const { data: members, isLoading } = useMembers();
   const { data: transactions } = usePoints();
@@ -68,15 +71,17 @@ export default function Members() {
             permissions.
           </p>
         </div>
-        <Button
-          onClick={() => {
-            setEditMember(null);
-            setModalOpen(true);
-          }}
-        >
-          <Plus className="w-4 h-4 mr-1" />
-          Add member
-        </Button>
+        {scope.canManage && (
+          <Button
+            onClick={() => {
+              setEditMember(null);
+              setModalOpen(true);
+            }}
+          >
+            <Plus className="w-4 h-4 mr-1" />
+            Add member
+          </Button>
+        )}
       </div>
 
       {isLoading ? (
@@ -89,15 +94,17 @@ export default function Members() {
           title="No members yet"
           description="Add the people in your family to start assigning tasks."
           action={
-            <Button
-              onClick={() => {
-                setEditMember(null);
-                setModalOpen(true);
-              }}
-            >
-              <Plus className="w-4 h-4 mr-1" />
-              Add member
-            </Button>
+            scope.canManage ? (
+              <Button
+                onClick={() => {
+                  setEditMember(null);
+                  setModalOpen(true);
+                }}
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                Add member
+              </Button>
+            ) : null
           }
         />
       ) : (
@@ -125,26 +132,29 @@ export default function Members() {
                     </p>
                   )}
                 </div>
-                <div className="flex gap-1">
-                  <button
-                    onClick={() => {
-                      setEditMember(m);
-                      setModalOpen(true);
-                    }}
-                    className="w-8 h-8 rounded-full hover:bg-accent flex items-center justify-center text-muted-foreground hover:text-accent-foreground"
-                  >
-                    <Pencil className="w-3.5 h-3.5" />
-                  </button>
-                  {m.active && (
+                {scope.canManage && (
+                  <div className="flex gap-1">
                     <button
-                      onClick={() => setConfirmMember(m)}
-                      className="w-8 h-8 rounded-full hover:bg-destructive/10 flex items-center justify-center text-muted-foreground hover:text-destructive"
+                      onClick={() => {
+                        setEditMember(m);
+                        setModalOpen(true);
+                      }}
+                      className="w-8 h-8 rounded-full hover:bg-accent flex items-center justify-center text-muted-foreground hover:text-accent-foreground"
                     >
-                      <PowerOff className="w-3.5 h-3.5" />
+                      <Pencil className="w-3.5 h-3.5" />
                     </button>
-                  )}
-                </div>
+                    {m.active && (
+                      <button
+                        onClick={() => setConfirmMember(m)}
+                        className="w-8 h-8 rounded-full hover:bg-destructive/10 flex items-center justify-center text-muted-foreground hover:text-destructive"
+                      >
+                        <PowerOff className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
+              {scope.canRevoke && <SecurityRevokeButton memberId={m.id} />}
               <div className="flex items-center justify-between mt-4 pt-4 border-t border-border">
                 <Link
                   to={`/member-profile?member=${m.id}`}
@@ -160,14 +170,14 @@ export default function Members() {
       )}
 
       <MemberModal
-        open={modalOpen}
+        open={scope.canManage && modalOpen}
         onOpenChange={setModalOpen}
         member={editMember}
         family={family}
       />
 
       <AlertDialog
-        open={!!confirmMember}
+        open={scope.canManage && !!confirmMember}
         onOpenChange={(o) => !o && setConfirmMember(null)}
       >
         <AlertDialogContent>

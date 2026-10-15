@@ -1,3 +1,4 @@
+vi.mock('@/hooks/useScope',()=>({useScope:()=>({role:'OWNER',canManage:true,enabled:true,key:(...parts)=>['scope','wall-test',...parts],prefix:['scope','wall-test']})}));
 vi.mock('@/hooks/useMemberViews', () => ({
   useLeaderboard: () => ({ data: { entries: [] } }),
 }));

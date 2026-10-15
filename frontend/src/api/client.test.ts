@@ -419,3 +419,11 @@ describe('network / transport failures are normalized to ApiError', () => {
     expect(err).not.toBeInstanceOf(ApiError);
   });
 });
+
+describe('subscription rejections refresh access without OAuth',()=>{
+ it.each([[403,'SUBSCRIPTION_REQUIRED'],[503,'ENTITLEMENT_UNAVAILABLE']] as const)('handles %s %s without signing out',async(status,code)=>{
+  const expired=vi.fn(),refresh=vi.fn();configureApiClient({getAccessToken:()=> 'same-token',onUnauthorized:expired,onAccessRevoked:refresh});
+  fetchMock.mockResolvedValue(makeResponse({status,jsonBody:{error:{code,message:'Family access changed'}}}));
+  await expect(request('POST','/family/tasks',{body:{title:'Task'}})).rejects.toMatchObject({code,status});expect(refresh).toHaveBeenCalledTimes(1);expect(expired).not.toHaveBeenCalled();
+ });
+});

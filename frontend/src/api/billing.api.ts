@@ -14,6 +14,11 @@ export interface BillingPlan {
   available: boolean;
 }
 export interface BillingSubscription {
+  entitlement?: {
+    state: string;
+    effectiveUntil: string | null;
+    ownerDeadlines?: Record<string, unknown> | null;
+  } | null;
   plan: BillingPlan | null;
   status: string | null;
   cancelAtPeriodEnd: boolean;

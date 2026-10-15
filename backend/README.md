@@ -82,6 +82,7 @@ The schema lives in `src/supabase/migrations/` as plain SQL, applied in numeric 
 | `008_member_views.sql` | Snapshot member reads, safe directory/profile, aggregate ranking, history indexes |
 | `009_tenant_onboarding.sql` | Explicit unpaid drafts, idempotent creation, owner onboarding, legacy access policy and lifecycle gates |
 | `010_stripe_billing.sql` | Durable billing accounts, checkout attempts, webhook inbox, fenced worker, audit and entitlement outbox |
+| `011_subscription_entitlements.sql` | Versioned access projection, strict write enforcement, bounded rollout and read-only recovery |
 | `seed.sql` | Idempotent demo family data |
 
 Apply them with any of these:
@@ -236,3 +237,5 @@ Vercel targets serverless/static workloads and does not keep a long-lived Fastif
 Member APIs, paginated history and rollout: [specification 03 guide](../docs/implementation/03-member-dashboard-rollout.md). Enable backend `MEMBER_VIEWS_ENABLED` only after migration 008 and staging acceptance.
 
 Stripe backend/worker configuration and staging acceptance: [specification 05 guide](../docs/implementation/05-stripe-billing-rollout.md). Secrets stay server-side; `npm run worker` runs the separate durable billing processor.
+
+Subscription access deployment and recovery: [Specification 06 rollout](../docs/implementation/06-subscription-entitlements-rollout.md).

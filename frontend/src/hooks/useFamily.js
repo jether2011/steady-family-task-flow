@@ -33,7 +33,7 @@ export const useMembers = (activeOnly = false) => {
     refetchInterval: 30000,
     refetchOnWindowFocus: true,
     queryKey: scope.key('members', { activeOnly }),
-    enabled: scope.enabled && scope.canManage,
+    enabled: scope.enabled && (scope.canReadManagement ?? scope.canManage),
     // The REST module filters the roster server-side via `?active=true`.
     // Pass `undefined` when not filtering so all members are returned.
     queryFn: ({ signal }) =>
@@ -67,7 +67,7 @@ export const usePoints = () => {
     refetchInterval: 30000,
     refetchOnWindowFocus: true,
     queryKey: scope.key('points'),
-    enabled: scope.enabled && scope.canManage,
+    enabled: scope.enabled && (scope.canReadManagement ?? scope.canManage),
     queryFn: ({ signal }) => points.list({}, signal),
   });
 };
@@ -78,10 +78,32 @@ export const useTemplates = () => {
     refetchInterval: 30000,
     refetchOnWindowFocus: true,
     queryKey: scope.key('templates'),
-    enabled: scope.enabled && scope.canManage,
+    enabled: scope.enabled && (scope.canReadManagement ?? scope.canManage),
     queryFn: ({ signal }) => templates.list(signal),
   });
 };
+
+function useProductMutation(options) {
+  const scope = useScope();
+  const allowed = () => {
+    if (!scope.canManage) {
+      const error = new Error('Your family currently has view-only access.');
+      error.code = 'SUBSCRIPTION_REQUIRED';
+      throw error;
+    }
+  };
+  return useMutation({
+    ...options,
+    onMutate: async (...args) => {
+      allowed();
+      return options.onMutate?.(...args);
+    },
+    mutationFn: (...args) => {
+      allowed();
+      return options.mutationFn(...args);
+    },
+  });
+}
 
 export const useCreateFamily = () => {
   const qc = useQueryClient();
@@ -95,7 +117,7 @@ export const useCreateFamily = () => {
 export const useUpdateFamily = () => {
   const qc = useQueryClient();
   const scope = useScope();
-  return useMutation({
+  return useProductMutation({
     mutationFn: ({ data }) => family.update(data),
     onSuccess: () => qc.invalidateQueries({ queryKey: scope.prefix }),
   });
@@ -104,7 +126,7 @@ export const useUpdateFamily = () => {
 export const useSaveMember = () => {
   const qc = useQueryClient();
   const scope = useScope();
-  return useMutation({
+  return useProductMutation({
     mutationFn: ({ id, data }) =>
       id ? members.update(id, data) : members.create(data),
     onSuccess: () => qc.invalidateQueries({ queryKey: scope.prefix }),
@@ -114,7 +136,7 @@ export const useSaveMember = () => {
 export const useDeleteMember = () => {
   const qc = useQueryClient();
   const scope = useScope();
-  return useMutation({
+  return useProductMutation({
     // DELETE /family/members/:id is a soft delete (sets active=false).
     mutationFn: (member) => members.remove(member.id),
     onSuccess: () => qc.invalidateQueries({ queryKey: scope.prefix }),
@@ -124,7 +146,7 @@ export const useDeleteMember = () => {
 export const useSaveTask = () => {
   const qc = useQueryClient();
   const scope = useScope();
-  return useMutation({
+  return useProductMutation({
     mutationFn: ({ id, data }) =>
       id ? tasks.update(id, data) : tasks.create(data),
     onSuccess: () => qc.invalidateQueries({ queryKey: scope.prefix }),
@@ -134,7 +156,7 @@ export const useSaveTask = () => {
 export const useDeleteTask = () => {
   const qc = useQueryClient();
   const scope = useScope();
-  return useMutation({
+  return useProductMutation({
     mutationFn: (id) => tasks.remove(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: scope.prefix }),
   });
@@ -143,7 +165,7 @@ export const useDeleteTask = () => {
 export const useMoveTask = () => {
   const qc = useQueryClient();
   const scope = useScope();
-  return useMutation({
+  return useProductMutation({
     // Board moves between non-DONE columns go through POST /tasks/:id/move.
     mutationFn: ({ id, data }) => tasks.move(id, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: scope.prefix }),
@@ -153,7 +175,7 @@ export const useMoveTask = () => {
 export const useCompleteTask = () => {
   const qc = useQueryClient();
   const scope = useScope();
-  return useMutation({
+  return useProductMutation({
     // Server owns the awarded points; the response (CompleteTaskPayload) is
     // returned verbatim by tasks.complete so callers can surface the awarded
     // points from the server only (R22.3).
@@ -210,7 +232,7 @@ export const useCompleteTask = () => {
 export const useReopenTask = () => {
   const qc = useQueryClient();
   const scope = useScope();
-  return useMutation({
+  return useProductMutation({
     mutationFn: ({ taskId }) => tasks.reopen(taskId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: scope.prefix });
@@ -221,7 +243,7 @@ export const useReopenTask = () => {
 export const useGenerateRecurring = () => {
   const qc = useQueryClient();
   const scope = useScope();
-  return useMutation({
+  return useProductMutation({
     mutationFn: ({ weekStart }) => templates.generate({ weekStart }),
     onSuccess: () => qc.invalidateQueries({ queryKey: scope.prefix }),
   });
@@ -230,7 +252,7 @@ export const useGenerateRecurring = () => {
 export const useSaveTemplate = () => {
   const qc = useQueryClient();
   const scope = useScope();
-  return useMutation({
+  return useProductMutation({
     mutationFn: ({ id, data }) =>
       id ? templates.update(id, data) : templates.create(data),
     onSuccess: () => qc.invalidateQueries({ queryKey: scope.prefix }),
@@ -240,7 +262,7 @@ export const useSaveTemplate = () => {
 export const useDeleteTemplate = () => {
   const qc = useQueryClient();
   const scope = useScope();
-  return useMutation({
+  return useProductMutation({
     mutationFn: (id) => templates.remove(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: scope.prefix }),
   });
@@ -262,7 +284,8 @@ export const useCompletions = (memberId) => {
     enabled:
       scope.enabled &&
       !!memberId &&
-      (scope.canManage || scope.memberId === memberId),
+      ((scope.canReadManagement ?? scope.canManage) ||
+        scope.memberId === memberId),
   });
 };
 
@@ -280,7 +303,7 @@ export const useAwards = () => {
 export const useSaveAward = () => {
   const qc = useQueryClient();
   const scope = useScope();
-  return useMutation({
+  return useProductMutation({
     mutationFn: ({ id, data }) =>
       id ? awards.update(id, data) : awards.create(data),
     onSuccess: () => qc.invalidateQueries({ queryKey: scope.prefix }),
@@ -290,7 +313,7 @@ export const useSaveAward = () => {
 export const useDeleteAward = () => {
   const qc = useQueryClient();
   const scope = useScope();
-  return useMutation({
+  return useProductMutation({
     mutationFn: (id) => awards.remove(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: scope.prefix }),
   });

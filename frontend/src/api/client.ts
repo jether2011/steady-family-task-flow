@@ -226,8 +226,13 @@ export async function request<T>(
     const currentScope =
       !signal?.aborted &&
       (res.status === 401 ||
-        (res.status === 403 &&
-          ['ACCESS_REVOKED', 'TENANT_ACCESS_RESTRICTED'].includes(err.code))) &&
+        ([403, 503].includes(res.status) &&
+          [
+            'ACCESS_REVOKED',
+            'TENANT_ACCESS_RESTRICTED',
+            'SUBSCRIPTION_REQUIRED',
+            'ENTITLEMENT_UNAVAILABLE',
+          ].includes(err.code))) &&
       (await resolveAccessToken()) === token;
     if (res.status === 401 && currentScope) {
       // Session expired / missing: redirect to login, then still throw so the
@@ -236,8 +241,13 @@ export async function request<T>(
     }
     if (
       currentScope &&
-      res.status === 403 &&
-      ['ACCESS_REVOKED', 'TENANT_ACCESS_RESTRICTED'].includes(err.code)
+      [403, 503].includes(res.status) &&
+      [
+        'ACCESS_REVOKED',
+        'TENANT_ACCESS_RESTRICTED',
+        'SUBSCRIPTION_REQUIRED',
+        'ENTITLEMENT_UNAVAILABLE',
+      ].includes(err.code)
     )
       config?.onAccessRevoked?.();
     throw err;

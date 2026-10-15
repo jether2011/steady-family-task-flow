@@ -5,6 +5,7 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { accessSummary } from './access.types.js';
 import {
+  securityRevoke,
   readMemberAccess,
   updateAccess,
   startEmailChange,
@@ -27,6 +28,23 @@ export function accessRoutes(app: FastifyInstance) {
     { schema: { params: Params, response: { 200: Response } } },
     async (req) => ({
       access: accessSummary(await readMemberAccess(req.params.id)),
+    }),
+  );
+  api.post(
+    '/family/members/:id/access/revoke',
+    {
+      schema: {
+        params: Params,
+        body: z
+          .object({ expectedVersion: z.number().int().positive() })
+          .strict(),
+        response: { 200: Response },
+      },
+    },
+    async (req) => ({
+      access: accessSummary(
+        await securityRevoke(req.params.id, req.body.expectedVersion),
+      ),
     }),
   );
   api.patch(

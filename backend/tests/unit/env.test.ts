@@ -185,3 +185,9 @@ describe('billing configuration gates', () => {
     ).toBe(false);
   });
 });
+
+describe('approved entitlement policy gates',()=>{
+ it('uses no numeric production defaults for grace/outage',()=>{const env=parseEnv(validSource());expect(env.ENTITLEMENT_ENFORCEMENT_ENABLED).toBe(false);expect(env.RENEWAL_GRACE_DAYS).toBeUndefined();expect(env.PROVIDER_OUTAGE_TOLERANCE_HOURS).toBeUndefined();expect(env.ENTITLEMENT_TRIALS_ENABLED).toBe(false);});
+ it('rejects enforcement without an approved complete policy',()=>{expect(()=>parseEnv(validSource({ENTITLEMENT_ENFORCEMENT_ENABLED:'true'}))).toThrow(/ENTITLEMENT_POLICY_VERSION/);});
+ it('requires an explicit legacy deadline to activate enforcement',()=>{expect(()=>parseEnv(validSource({ENTITLEMENT_ENFORCEMENT_ENABLED:'true',ENTITLEMENT_POLICY_VERSION:'test-v1',ENTITLEMENT_POLICY_APPROVAL:'fixture',RENEWAL_GRACE_DAYS:'7',PROVIDER_OUTAGE_TOLERANCE_HOURS:'24',ENTITLEMENT_EXCEPTION_POLICY:'RESTRICT',STRIPE_ACCOUNT_ID:'acct_fixture',STRIPE_PRICE_ID:'price_fixture',BILLING_MEMBER_LIMIT:'unlimited'}))).toThrow(/LEGACY_ENTITLEMENT_DEADLINE/);});
+});

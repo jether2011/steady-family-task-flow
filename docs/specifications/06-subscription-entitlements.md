@@ -1,6 +1,6 @@
 # Specification 6: Subscription entitlements and rollout
 
-Date: 2026-10-11 · Status: Design draft · Branch: `codex/subscription-entitlements`
+Date: 2026-10-11 · Status: Implemented; deployment and policy acceptance gated · Branch: `codex/subscription-entitlements`
 
 Depends on specifications [1](01-tenant-membership-roles.md), [2](02-email-otp-login.md), [3](03-member-dashboard-history.md), [4](04-saas-tenant-onboarding.md), and [5](05-stripe-subscriptions.md). Source: [PRD](../product/PRD-family-access-and-saas.md); [shared conventions](README.md).
 
@@ -154,3 +154,5 @@ Alert on projection/inbox lag, policy missing configuration, unknown provider st
 Completion requires six-feature staging acceptance, disposable DB transaction/policy tests, provider test lifecycle evidence, both app builds/typechecks, migration/rollback rehearsal and business approval of production gates. Specifications are complete when these contracts are documented; live rollout remains dependent on those approvals.
 
 Traceability: TEN-03–06, BILL-04–09, MEM-04/05/08, VIEW-06–08, PRD quality requirements and section 10 migration/release scenarios.
+
+Implementation and operational acceptance: [rollout guide](../implementation/06-subscription-entitlements-rollout.md). Production values require explicit environment configuration; proposed values above are not runtime defaults.

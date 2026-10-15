@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
+import { resolveEntitlement } from '../entitlements/entitlements.service.js';
 import { approvedPlan } from './billing.provider.js';
 import {
   checkout,
@@ -56,6 +57,7 @@ export function billingRoutes(app: FastifyInstance) {
         response: {
           200: z.object({
             plan: plan.nullable(),
+            entitlement: z.unknown().nullable().optional(),
             status: z.string().nullable(),
             cancelAtPeriodEnd: z.boolean(),
             paidThrough: z.string().nullable(),
@@ -76,6 +78,10 @@ export function billingRoutes(app: FastifyInstance) {
         ) ?? state.subscriptions[0];
       return {
         plan: await approvedPlan().catch(() => null),
+        entitlement: await resolveEntitlement(
+          req.authUserId!,
+          req.ctx!.familyId!,
+        ).catch(() => null),
         status: current?.status ?? null,
         cancelAtPeriodEnd: current?.cancel_at_period_end ?? false,
         paidThrough: current?.paid_through ?? null,

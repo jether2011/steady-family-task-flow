@@ -38,6 +38,7 @@ export default function Home() {
   return scope.role === 'MEMBER' ? <MemberDashboard /> : <ManagementHome />;
 }
 function ManagementHome() {
+  const scope = useScope();
   const today = todayKey();
   const { data: family } = useFamily();
   const { data: members } = useMembers(true);
@@ -103,15 +104,17 @@ function ManagementHome() {
             {family?.responsible_name ? `, ${family.responsible_name}` : ''}
           </h1>
         </div>
-        <Button
-          onClick={() => {
-            setEditTask(null);
-            setModalOpen(true);
-          }}
-        >
-          <Plus className="w-4 h-4 mr-1" />
-          New task
-        </Button>
+        {scope.canManage && (
+          <Button
+            onClick={() => {
+              setEditTask(null);
+              setModalOpen(true);
+            }}
+          >
+            <Plus className="w-4 h-4 mr-1" />
+            New task
+          </Button>
+        )}
       </div>
 
       <div className="grid lg:grid-cols-3 gap-4">
@@ -211,15 +214,17 @@ function ManagementHome() {
             title="No tasks for today"
             description="Add a task or generate recurring tasks from the board."
             action={
-              <Button
-                onClick={() => {
-                  setEditTask(null);
-                  setModalOpen(true);
-                }}
-              >
-                <Plus className="w-4 h-4 mr-1" />
-                Add a task
-              </Button>
+              scope.canManage ? (
+                <Button
+                  onClick={() => {
+                    setEditTask(null);
+                    setModalOpen(true);
+                  }}
+                >
+                  <Plus className="w-4 h-4 mr-1" />
+                  Add a task
+                </Button>
+              ) : null
             }
           />
         ) : (
@@ -229,12 +234,16 @@ function ManagementHome() {
                 key={task.id}
                 task={task}
                 member={memberMap[task.assigned_member_id]}
-                onComplete={handleComplete}
-                onReopen={handleReopen}
-                onEdit={(t) => {
-                  setEditTask(t);
-                  setModalOpen(true);
-                }}
+                onComplete={scope.canManage ? handleComplete : undefined}
+                onReopen={scope.canManage ? handleReopen : undefined}
+                onEdit={
+                  scope.canManage
+                    ? (t) => {
+                        setEditTask(t);
+                        setModalOpen(true);
+                      }
+                    : undefined
+                }
               />
             ))}
           </div>
@@ -242,7 +251,7 @@ function ManagementHome() {
       </div>
 
       <TaskModal
-        open={modalOpen}
+        open={scope.canManage && modalOpen}
         onOpenChange={setModalOpen}
         task={editTask}
         members={members}

@@ -31,7 +31,11 @@ function errMsg(e) {
 
 export default function Wall() {
   const scope = useScope();
-  return scope.role === 'MEMBER' ? <MemberWall /> : <ManagementWall />;
+  return scope.role === 'MEMBER' || scope.canManage === false ? (
+    <MemberWall />
+  ) : (
+    <ManagementWall />
+  );
 }
 function ManagementWall() {
   const today = new Date().toISOString().slice(0, 10);

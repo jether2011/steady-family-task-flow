@@ -320,7 +320,7 @@ describe('durable provider operations', () => {
       status: 'active',
       cancel_at_period_end: false,
       cancel_at: 1793491200,
-      trial_end: null,
+      trial_end: 123,
       latest_invoice: 'in_fixture',
     };
     h.subs.mockReturnValue(page([sub]));
@@ -328,6 +328,7 @@ describe('durable provider operations', () => {
     expect(h.rpc).toHaveBeenCalledWith(
       'billing_apply_snapshot',
       expect.objectContaining({
+        p_alert: null,
         p_subscriptions: [
           expect.objectContaining({
             id: 'sub_fixture',

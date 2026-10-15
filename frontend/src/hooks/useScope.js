@@ -4,10 +4,11 @@ export function useScope() {
     access = auth?.access;
   const prefix = [
     'scope',
-    access?.user?.id ?? 'unresolved',
+    access?.user?.id ?? auth?.user?.id ?? 'unresolved',
     access?.family?.id ?? null,
     access?.membership?.role ?? null,
     access?.membership?.accessVersion ?? null,
+    access?.access?.version ?? null,
   ];
   return {
     prefix,
@@ -23,5 +24,8 @@ export function useScope() {
     memberId: access?.membership?.memberId,
     access,
     canManage: !!access?.capabilities?.includes('family:manage'),
+    canReadManagement:
+      !!access && ['OWNER', 'MANAGER'].includes(access.membership?.role),
+    canRevoke: !!access?.capabilities?.includes('members:security-revoke'),
   };
 }

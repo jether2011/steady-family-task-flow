@@ -93,6 +93,7 @@ export const AuthProvider = ({ children }) => {
             next.family?.id,
             next.membership?.role,
             next.membership?.accessVersion,
+            next.access?.version,
             next.state,
           ]);
           if (scope.current !== nextScope) {

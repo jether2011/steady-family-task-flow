@@ -111,6 +111,10 @@ export async function changeEmail(
   );
 }
 export const members = {
+  revokeAccess: (id: string, expectedVersion: number) =>
+    post<{ access: AccessSummary }>(`/family/members/${id}/access/revoke`, {
+      expectedVersion,
+    }),
   getAccess,
   setAccess,
   changeEmail,
