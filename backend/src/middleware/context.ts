@@ -43,6 +43,7 @@ export async function contextHook(request: FastifyRequest) {
   if (!request.authUserId) throw new Unauthorized();
   // /me resolves/claims once in its service; email confirmation is valid with revoked membership.
   if (
+    request.routeOptions.url === '/api/v1/billing/plan' ||
     request.routeOptions.url === '/api/v1/families' ||
     request.routeOptions.url === '/api/v1/me' ||
     request.routeOptions.url === '/api/v1/me/email-change/confirm'
@@ -52,6 +53,11 @@ export async function contextHook(request: FastifyRequest) {
   requireFamilyContext(request);
   const ctx = request.ctx;
   const url = request.routeOptions.url ?? '';
+  if (url === '/api/v1/billing/plan') return;
+  if (url.startsWith('/api/v1/billing/')) {
+    if (ctx.role !== 'OWNER') throw new Forbidden();
+    return;
+  }
   if (url === '/api/v1/family/onboarding') {
     if (ctx.role !== 'OWNER') throw new Forbidden();
     return;

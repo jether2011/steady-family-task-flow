@@ -169,3 +169,5 @@ Google remains available. Enable `VITE_EMAIL_OTP_ENABLED=true` after configuring
 ## Member dashboard and history
 
 The backend `member:views` capability enables the personal Home, shared board, own profile/history, rankings, awards catalog and view-only Wall. Owner/Manager retain management screens. All queries and optimistic mutations use the current app-user/family/role/access-version scope. History loads 50 records initially with explicit paging; summary cards use full-range server aggregates. Rankings use the server API, including UTC range labels and competition ranks. See the [member rollout guide](../docs/implementation/03-member-dashboard-rollout.md).
+
+Owner subscription, return and hosted portal flows: [specification 05 guide](../docs/implementation/05-stripe-billing-rollout.md). Commercial configuration is supplied by the backend; no Stripe key is required in the frontend.

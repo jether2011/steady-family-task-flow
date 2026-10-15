@@ -81,6 +81,7 @@ The schema lives in `src/supabase/migrations/` as plain SQL, applied in numeric 
 | `007_membership_access.sql` | Canonical identities, owner backfill, memberships, transactional authorization and role policies |
 | `008_member_views.sql` | Snapshot member reads, safe directory/profile, aggregate ranking, history indexes |
 | `009_tenant_onboarding.sql` | Explicit unpaid drafts, idempotent creation, owner onboarding, legacy access policy and lifecycle gates |
+| `010_stripe_billing.sql` | Durable billing accounts, checkout attempts, webhook inbox, fenced worker, audit and entitlement outbox |
 | `seed.sql` | Idempotent demo family data |
 
 Apply them with any of these:
@@ -233,3 +234,5 @@ Vercel targets serverless/static workloads and does not keep a long-lived Fastif
 - `GET`/`PATCH /family` returns 404 without an active membership; `/me` reports NO_ACCESS or REVOKED. Draft product access returns 403; owners use `/family/onboarding` to resume setup. Login does not create a family.
 
 Member APIs, paginated history and rollout: [specification 03 guide](../docs/implementation/03-member-dashboard-rollout.md). Enable backend `MEMBER_VIEWS_ENABLED` only after migration 008 and staging acceptance.
+
+Stripe backend/worker configuration and staging acceptance: [specification 05 guide](../docs/implementation/05-stripe-billing-rollout.md). Secrets stay server-side; `npm run worker` runs the separate durable billing processor.

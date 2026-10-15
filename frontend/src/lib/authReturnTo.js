@@ -9,6 +9,9 @@ const routes = new Set([
   '/member-profile',
   '/points-history',
   '/family-awards',
+  '/subscribe',
+  '/billing',
+  '/billing/return',
 ]);
 const memberRoutes = new Set([
   '/',

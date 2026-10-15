@@ -20,7 +20,29 @@ services:
       dockerfile: Dockerfile
     # Config comes from the environment / root .env (R29.4). The service-role
     # key is interpolated from the host — never a literal value in this file.
-    environment:
+    environment: &backend-environment
+      CHECKOUT_ENABLED: ${CHECKOUT_ENABLED:-false}
+      STRIPE_MODE: ${STRIPE_MODE:-TEST}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_ACCOUNT_ID: ${STRIPE_ACCOUNT_ID:-}
+      STRIPE_MERCHANT_COUNTRY: ${STRIPE_MERCHANT_COUNTRY:-}
+      STRIPE_PRICE_ID: ${STRIPE_PRICE_ID:-}
+      STRIPE_PORTAL_CONFIGURATION_ID: ${STRIPE_PORTAL_CONFIGURATION_ID:-}
+      BILLING_PLAN_TITLE: ${BILLING_PLAN_TITLE:-}
+      BILLING_PLAN_FEATURES: ${BILLING_PLAN_FEATURES:-}
+      BILLING_MEMBER_LIMIT: ${BILLING_MEMBER_LIMIT:-}
+      BILLING_CURRENCY: ${BILLING_CURRENCY:-}
+      BILLING_TAX_BEHAVIOR: ${BILLING_TAX_BEHAVIOR:-}
+      BILLING_AUTOMATIC_TAX: ${BILLING_AUTOMATIC_TAX:-}
+      BILLING_PAYMENT_METHODS: ${BILLING_PAYMENT_METHODS:-}
+      BILLING_TERMS_URL: ${BILLING_TERMS_URL:-}
+      BILLING_PRIVACY_URL: ${BILLING_PRIVACY_URL:-}
+      BILLING_POLICY_URL: ${BILLING_POLICY_URL:-}
+      BILLING_TAX_DISCLOSURE: ${BILLING_TAX_DISCLOSURE:-}
+      BILLING_APPROVAL_REFERENCE: ${BILLING_APPROVAL_REFERENCE:-}
+      BILLING_EVENT_RETENTION_DAYS: ${BILLING_EVENT_RETENTION_DAYS:-}
+      BILLING_MAX_RETRIES: ${BILLING_MAX_RETRIES:-10}
       SELF_SERVICE_SIGNUP_ENABLED: ${SELF_SERVICE_SIGNUP_ENABLED:-false}
       BILLING_AVAILABLE: ${BILLING_AVAILABLE:-false}
       MEMBER_VIEWS_ENABLED: ${MEMBER_VIEWS_ENABLED:-false}
@@ -46,6 +68,17 @@ services:
       timeout: 5s
       start_period: 20s
       retries: 3
+    restart: unless-stopped
+
+  billing-worker:
+    profiles: [billing]
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment: *backend-environment
+    command: ["node", "dist/billing-worker.js"]
+    healthcheck:
+      disable: true
     restart: unless-stopped
 
   frontend:

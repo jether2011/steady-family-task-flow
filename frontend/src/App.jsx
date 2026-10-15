@@ -4,6 +4,7 @@ import { queryClientInstance } from '@/lib/query-client';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider } from '@/lib/AuthContext';
+import BillingRoute from '@/components/BillingRoute';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import ScrollToTop from './components/ScrollToTop';
 // Add page imports here
@@ -29,11 +30,12 @@ const AuthenticatedApp = () => {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/create-family" element={<Onboarding creating />} />
-      {['/no-access', '/access-revoked', '/access-error', '/subscribe'].map(
-        (path) => (
-          <Route key={path} path={path} element={<AccessStatus />} />
-        ),
-      )}
+      {['/no-access', '/access-revoked', '/access-error'].map((path) => (
+        <Route key={path} path={path} element={<AccessStatus />} />
+      ))}
+      {['/subscribe', '/billing', '/billing/return'].map((path) => (
+        <Route key={path} path={path} element={<BillingRoute />} />
+      ))}
       <Route path="/access-email-confirm" element={<AccessEmailConfirm />} />
       <Route element={<ProtectedRoute />}>
         <Route path="/onboarding" element={<Onboarding />} />

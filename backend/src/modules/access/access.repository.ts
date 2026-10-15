@@ -2,6 +2,10 @@ import { getServiceRoleClient } from '../../config/supabase.js';
 import { AppError } from '../../shared/errors/index.js';
 import { mutationIdentity } from './access.store.js';
 const errors: Record<string, number> = {
+  SUBSCRIPTION_EXISTS: 409,
+  PLAN_UNAVAILABLE: 422,
+  BILLING_UNAVAILABLE: 503,
+  BILLING_FENCE_LOST: 409,
   IDEMPOTENCY_CONFLICT: 409,
   TENANT_ASSOCIATION_CONFLICT: 409,
   EMAIL_VERIFICATION_REQUIRED: 403,
