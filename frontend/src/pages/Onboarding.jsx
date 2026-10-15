@@ -1,3 +1,4 @@
+import { useScope } from '@/hooks/useScope';
 import React, { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
@@ -12,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
   SelectContent,
-  SelectItem
+  SelectItem,
 } from '@/components/ui/select';
 import { RELATIONSHIP_LABELS, isFamilyConfigured } from '@/lib/familyUtils';
 import { Loader2, ArrowRight } from 'lucide-react';
@@ -20,14 +21,15 @@ import { Loader2, ArrowRight } from 'lucide-react';
 const RELATIONSHIPS = ['FATHER', 'MOTHER', 'GUARDIAN', 'OTHER'];
 
 export default function Onboarding() {
+  const scope = useScope();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, retryAccessResolution } = useAuth();
   const { data: family, isLoading } = useFamily();
 
-  // The family is auto-created on first `/me` login, so onboarding only ever
-  // UPDATES the existing household profile (PATCH /family) — it never creates a
+  // Membership resolution identifies an existing household. Onboarding
+  // UPDATES that household profile (PATCH /family) — it never creates a
   // second family. `useCreateFamily` maps to that PATCH update.
   const createFamily = useCreateFamily();
 
@@ -36,7 +38,7 @@ export default function Onboarding() {
   const [form, setForm] = useState({
     name: '',
     responsible_name: '',
-    relationship: 'FATHER'
+    relationship: 'FATHER',
   });
   const [initialized, setInitialized] = useState(false);
 
@@ -46,7 +48,7 @@ export default function Onboarding() {
     setForm({
       name: family.name && family.name !== 'My Family' ? family.name : '',
       responsible_name: user?.full_name || '',
-      relationship: family.relationship || 'FATHER'
+      relationship: family.relationship || 'FATHER',
     });
     setInitialized(true);
   }
@@ -76,14 +78,19 @@ export default function Onboarding() {
       await createFamily.mutateAsync({
         name: form.name.trim(),
         responsible_name: form.responsible_name.trim(),
-        relationship: form.relationship
+        relationship: form.relationship,
       });
       // Make the freshly-configured family authoritative before navigating so
       // Layout sees it as configured and renders the app (not a redirect loop).
-      await qc.refetchQueries({ queryKey: ['family'] });
+      await qc.refetchQueries({ queryKey: scope.key('family') });
+      await retryAccessResolution?.();
       navigate('/', { replace: true });
     } catch (err) {
-      toast({ title: 'Error', description: errorMessage(err), variant: 'destructive' });
+      toast({
+        title: 'Error',
+        description: errorMessage(err),
+        variant: 'destructive',
+      });
     }
   };
 
@@ -100,11 +107,16 @@ export default function Onboarding() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="w-14 h-14 rounded-2xl bg-primary flex items-center justify-center mx-auto mb-4 shadow-lg shadow-primary/20">
-            <span className="text-primary-foreground font-bold text-2xl">F</span>
+            <span className="text-primary-foreground font-bold text-2xl">
+              F
+            </span>
           </div>
-          <h1 className="font-heading font-bold text-2xl">Welcome to FamTask</h1>
+          <h1 className="font-heading font-bold text-2xl">
+            Welcome to FamTask
+          </h1>
           <p className="text-muted-foreground text-sm mt-2">
-            Let's set up your family task board. You're the responsible — everyone else is a member you manage.
+            Let's set up your family task board. You're the responsible —
+            everyone else is a member you manage.
           </p>
         </div>
 
@@ -133,16 +145,27 @@ export default function Onboarding() {
             </div>
             <div className="space-y-1.5">
               <Label>Your role</Label>
-              <Select value={form.relationship} onValueChange={(v) => set('relationship', v)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+              <Select
+                value={form.relationship}
+                onValueChange={(v) => set('relationship', v)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   {RELATIONSHIPS.map((r) => (
-                    <SelectItem key={r} value={r}>{RELATIONSHIP_LABELS[r]}</SelectItem>
+                    <SelectItem key={r} value={r}>
+                      {RELATIONSHIP_LABELS[r]}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            <Button type="submit" className="w-full h-11" disabled={createFamily.isPending}>
+            <Button
+              type="submit"
+              className="w-full h-11"
+              disabled={createFamily.isPending}
+            >
               {createFamily.isPending ? (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               ) : (

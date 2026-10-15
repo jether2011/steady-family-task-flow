@@ -1,5 +1,13 @@
+import { useScope } from '@/hooks/useScope';
+import MemberCatalog from './MemberCatalog';
 import React, { useState, useMemo } from 'react';
-import { useFamily, useMembers, useAwards, usePoints, useDeleteAward } from '@/hooks/useFamily';
+import {
+  useFamily,
+  useMembers,
+  useAwards,
+  usePoints,
+  useDeleteAward,
+} from '@/hooks/useFamily';
 import AwardModal from '@/components/awards/AwardModal';
 import EmptyState from '@/components/common/EmptyState';
 import MemberAvatar from '@/components/family/MemberAvatar';
@@ -14,11 +22,19 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
-  AlertDialogTitle
+  AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
 
 export default function FamilyAwards() {
+  const scope = useScope();
+  return scope.role === 'MEMBER' ? (
+    <MemberCatalog />
+  ) : (
+    <ManagementFamilyAwards />
+  );
+}
+function ManagementFamilyAwards() {
   const { data: family } = useFamily();
   const { data: members } = useMembers();
   const { data: awards, isLoading } = useAwards();
@@ -39,7 +55,7 @@ export default function FamilyAwards() {
 
   const activeMembers = useMemo(
     () => (members || []).filter((m) => m.active),
-    [members]
+    [members],
   );
 
   const handleDelete = async () => {
@@ -58,12 +74,20 @@ export default function FamilyAwards() {
     <div className="p-4 lg:p-8 max-w-5xl mx-auto space-y-6 animate-fade-in">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="font-heading font-bold text-2xl lg:text-3xl">Family awards</h1>
+          <h1 className="font-heading font-bold text-2xl lg:text-3xl">
+            Family awards
+          </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Define milestones and rewards your family can aim for with the points they earn.
+            Define milestones and rewards your family can aim for with the
+            points they earn.
           </p>
         </div>
-        <Button onClick={() => { setEditAward(null); setModalOpen(true); }}>
+        <Button
+          onClick={() => {
+            setEditAward(null);
+            setModalOpen(true);
+          }}
+        >
           <Plus className="w-4 h-4 mr-1" />
           New award
         </Button>
@@ -79,7 +103,12 @@ export default function FamilyAwards() {
           title="No awards yet"
           description="Create a reward like 'Movie night' or 'Extra screen time' and set how many points it costs."
           action={
-            <Button onClick={() => { setEditAward(null); setModalOpen(true); }}>
+            <Button
+              onClick={() => {
+                setEditAward(null);
+                setModalOpen(true);
+              }}
+            >
               <Plus className="w-4 h-4 mr-1" />
               New award
             </Button>
@@ -88,13 +117,15 @@ export default function FamilyAwards() {
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {(awards || []).map((a) => {
-            const canRedeem = activeMembers.filter((m) => (pointsByMember[m.id] || 0) >= a.points_cost);
+            const canRedeem = activeMembers.filter(
+              (m) => (pointsByMember[m.id] || 0) >= a.points_cost,
+            );
             return (
               <div
                 key={a.id}
                 className={cn(
                   'rounded-3xl border border-border bg-card p-5 flex flex-col',
-                  !a.active && 'opacity-50'
+                  !a.active && 'opacity-50',
                 )}
               >
                 <div className="flex items-start justify-between">
@@ -106,7 +137,10 @@ export default function FamilyAwards() {
                   </div>
                   <div className="flex gap-1">
                     <button
-                      onClick={() => { setEditAward(a); setModalOpen(true); }}
+                      onClick={() => {
+                        setEditAward(a);
+                        setModalOpen(true);
+                      }}
                       className="w-8 h-8 rounded-full hover:bg-accent flex items-center justify-center text-muted-foreground hover:text-accent-foreground"
                     >
                       <Pencil className="w-3.5 h-3.5" />
@@ -120,23 +154,33 @@ export default function FamilyAwards() {
                   </div>
                 </div>
 
-                <h3 className="font-heading font-semibold text-lg mt-3">{a.title}</h3>
+                <h3 className="font-heading font-semibold text-lg mt-3">
+                  {a.title}
+                </h3>
                 {a.description && (
-                  <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{a.description}</p>
+                  <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                    {a.description}
+                  </p>
                 )}
 
                 <div className="flex items-center justify-between mt-3 pt-3 border-t border-border">
                   <span className="text-xs text-muted-foreground">Cost</span>
-                  <span className="text-xl font-bold text-warning">{a.points_cost} pts</span>
+                  <span className="text-xl font-bold text-warning">
+                    {a.points_cost} pts
+                  </span>
                 </div>
 
                 <div className="mt-3">
                   <p className="text-xs text-muted-foreground mb-1.5">
-                    {canRedeem.length === 0 ? 'No one can redeem yet' : 'Can redeem now'}
+                    {canRedeem.length === 0
+                      ? 'No one can redeem yet'
+                      : 'Can redeem now'}
                   </p>
                   <div className="flex flex-wrap gap-1.5">
                     {canRedeem.length === 0 ? (
-                      <span className="text-xs text-muted-foreground italic">Keep earning points!</span>
+                      <span className="text-xs text-muted-foreground italic">
+                        Keep earning points!
+                      </span>
                     ) : (
                       canRedeem.map((m) => (
                         <MemberAvatar key={m.id} member={m} size="xs" />
@@ -157,7 +201,10 @@ export default function FamilyAwards() {
         family={family}
       />
 
-      <AlertDialog open={!!confirmDelete} onOpenChange={(o) => !o && setConfirmDelete(null)}>
+      <AlertDialog
+        open={!!confirmDelete}
+        onOpenChange={(o) => !o && setConfirmDelete(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this award?</AlertDialogTitle>

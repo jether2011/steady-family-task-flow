@@ -18,6 +18,7 @@ import {
 } from '@/lib/authProvider';
 import { loginPath, safeReturnTo } from '@/lib/authReturnTo';
 const AuthContext = createContext(null);
+export const useOptionalAuth = () => useContext(AuthContext);
 function showLogin() {
   if (window.location.pathname === '/login') return;
   window.history.replaceState(

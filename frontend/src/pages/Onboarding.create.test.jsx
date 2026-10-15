@@ -1,3 +1,20 @@
+vi.mock('@/hooks/useScope', () => ({
+  useScope: () => ({
+    prefix: ['scope', 'test-user', 'test-family', 'OWNER', 1],
+    key: (...parts) => [
+      'scope',
+      'test-user',
+      'test-family',
+      'OWNER',
+      1,
+      ...parts,
+    ],
+    enabled: true,
+    role: 'OWNER',
+    canManage: true,
+    memberId: null,
+  }),
+}));
 import React from 'react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
@@ -18,7 +35,12 @@ const h = vi.hoisted(() => ({
   navigate: vi.fn(),
   createFamilyMutateAsync: vi.fn(),
   createFamilyPending: false,
-  family: { id: 'fam-1', name: 'My Family', relationship: null, responsible_name: null },
+  family: {
+    id: 'fam-1',
+    name: 'My Family',
+    relationship: null,
+    responsible_name: null,
+  },
   familyLoading: false,
   user: { full_name: 'Jether', email: 'jether@example.com' },
   toast: vi.fn(),
@@ -63,7 +85,12 @@ function renderOnboarding() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  h.family = { id: 'fam-1', name: 'My Family', relationship: null, responsible_name: null };
+  h.family = {
+    id: 'fam-1',
+    name: 'My Family',
+    relationship: null,
+    responsible_name: null,
+  };
   h.familyLoading = false;
   h.createFamilyPending = false;
   h.user = { full_name: 'Jether', email: 'jether@example.com' };
@@ -87,7 +114,9 @@ describe('Onboarding — Create family', () => {
     await user.type(famInput, 'Rodrigues Family');
     await user.click(screen.getByRole('button', { name: /create family/i }));
 
-    await waitFor(() => expect(h.createFamilyMutateAsync).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(h.createFamilyMutateAsync).toHaveBeenCalledTimes(1),
+    );
     expect(h.createFamilyMutateAsync).toHaveBeenCalledWith({
       name: 'Rodrigues Family',
       responsible_name: 'Jether',
@@ -100,7 +129,9 @@ describe('Onboarding — Create family', () => {
 
   it('surfaces the API error message in a toast on failure (meaningful, not blank)', async () => {
     h.createFamilyMutateAsync.mockRejectedValue(
-      new Error('Cannot reach the server at http://localhost:8080/api/v1. Is the backend running and is VITE_API_URL correct?'),
+      new Error(
+        'Cannot reach the server at http://localhost:8080/api/v1. Is the backend running and is VITE_API_URL correct?',
+      ),
     );
     const user = userEvent.setup();
     renderOnboarding();
@@ -119,7 +150,9 @@ describe('Onboarding — Create family', () => {
 
   it('does NOT offer a "Load sample family" option', () => {
     renderOnboarding();
-    expect(screen.queryByRole('button', { name: /sample/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /sample/i }),
+    ).not.toBeInTheDocument();
   });
 
   it('redirects to "/" when the family is already configured', () => {
@@ -132,6 +165,8 @@ describe('Onboarding — Create family', () => {
     renderOnboarding();
     // Navigate (react-router) renders nothing visible; assert the setup form is
     // not shown (the configured-family short-circuit returned <Navigate/>).
-    expect(screen.queryByRole('button', { name: /create family/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /create family/i }),
+    ).not.toBeInTheDocument();
   });
 });

@@ -165,3 +165,7 @@ From the repo root, `docker compose up -d --build` builds and runs the backend a
 Google remains available. Enable `VITE_EMAIL_OTP_ENABLED=true` after configuring Supabase email templates, custom SMTP, six-digit codes and provider-side abuse controls. `VITE_AUTH_CAPTCHA_SITE_KEY` optionally enables the Cloudflare Turnstile widget; its secret belongs in Supabase. These settings are build-time values.
 
 `/login` handles both methods. Protected URLs preserve a validated local destination; no-access, revoked and resolution-error routes provide retry/change-account actions. Logout and API 401 return to neutral login. See the [rollout and recovery guide](../docs/implementation/02-email-otp-rollout.md).
+
+## Member dashboard and history
+
+The backend `member:views` capability enables the personal Home, shared board, own profile/history, rankings, awards catalog and view-only Wall. Owner/Manager retain management screens. All queries and optimistic mutations use the current app-user/family/role/access-version scope. History loads 50 records initially with explicit paging; summary cards use full-range server aggregates. Rankings use the server API, including UTC range labels and competition ranks. See the [member rollout guide](../docs/implementation/03-member-dashboard-rollout.md).

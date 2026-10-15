@@ -53,6 +53,10 @@ export async function contextHook(request: FastifyRequest) {
   if (ctx.role === 'MEMBER') {
     const allowed = new Set([
       '/api/v1/family',
+      '/api/v1/family/member-dashboard',
+      '/api/v1/family/member-directory',
+      '/api/v1/family/points/summary',
+      '/api/v1/family/members/:id/profile',
       '/api/v1/family/tasks',
       '/api/v1/family/board',
       '/api/v1/family/leaderboard',
@@ -62,11 +66,11 @@ export async function contextHook(request: FastifyRequest) {
     ]);
     if (request.method !== 'GET' || !allowed.has(url)) throw new Forbidden();
     if (
-      url.endsWith('/completions') &&
+      (url.endsWith('/completions') || url.endsWith('/profile')) &&
       (request.params as { id: string }).id !== ctx.memberId
     )
       throw new NotFound();
-    if (url.endsWith('/points')) {
+    if (url.endsWith('/points') || url.endsWith('/points/summary')) {
       const query = request.query as { memberId?: string };
       if (query.memberId && query.memberId !== ctx.memberId)
         throw new NotFound();

@@ -39,15 +39,17 @@ describe('access boundary', () => {
   });
   it('keeps member out of management dashboard', () => {
     state.value.access.membership.role = 'MEMBER';
+    state.value.access.membership.memberId = 'self';
     view();
-    expect(screen.getByText('Family access connected')).toBeInTheDocument();
+    expect(screen.getByText('Member views unavailable')).toBeInTheDocument();
     expect(screen.queryByText('Management dashboard')).not.toBeInTheDocument();
   });
-  it('returns a member management link to home with an access message', () => {
-    state.value.access.membership.role = 'MEMBER';
+  it('blocks management deep links before mounting their hooks', () => {
+    state.value.access.membership = { role: 'MEMBER', memberId: 'self' };
+    state.value.access.capabilities = ['member:views'];
     view('/settings');
     expect(
-      screen.getByText(/Your role does not allow that page/),
+      screen.getByText('Page unavailable for your role'),
     ).toBeInTheDocument();
     expect(screen.queryByText('Settings')).not.toBeInTheDocument();
   });

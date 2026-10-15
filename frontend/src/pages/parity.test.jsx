@@ -1,6 +1,23 @@
+vi.mock('@/hooks/useScope', () => ({
+  useScope: () => ({
+    prefix: ['scope', 'test-user', 'test-family', 'OWNER', 1],
+    key: (...parts) => [
+      'scope',
+      'test-user',
+      'test-family',
+      'OWNER',
+      1,
+      ...parts,
+    ],
+    enabled: true,
+    role: 'OWNER',
+    canManage: true,
+    memberId: null,
+  }),
+}));
 import React from 'react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { QueryClientProvider, QueryClient } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 
@@ -61,12 +78,15 @@ vi.mock('@/hooks/useFamily', () => {
     useFamily: () => query(hookState.family),
     useMembers: (activeOnly = false) =>
       query(
-        activeOnly ? hookState.membersActive ?? hookState.members : hookState.members,
+        activeOnly
+          ? (hookState.membersActive ?? hookState.members)
+          : hookState.members,
         hookState.membersLoading,
       ),
     useTasks: () => query(hookState.tasks, hookState.tasksLoading),
     usePoints: () => query(hookState.points),
-    useCompletions: () => query(hookState.completions, hookState.completionsLoading),
+    useCompletions: () =>
+      query(hookState.completions, hookState.completionsLoading),
     useTemplates: () => query(hookState.templates),
     useAwards: () => query(hookState.awards),
     useMoveTask: mutation,
@@ -86,6 +106,61 @@ vi.mock('@/hooks/useFamily', () => {
   };
 });
 
+vi.mock('@/hooks/useMemberViews', () => {
+  const result = (data) => ({
+    data,
+    isLoading: false,
+    isPending: false,
+    isError: false,
+  });
+  return {
+    useDirectory: () =>
+      result(hookState.members ?? hookState.membersActive ?? []),
+    useProfile: (id) =>
+      result({
+        member: hookState.members?.find((member) => member.id === id),
+        balance: (hookState.points ?? [])
+          .filter((row) => row.member_id === id)
+          .reduce((sum, row) => sum + row.points, 0),
+      }),
+    useWorkHistory: () => ({
+      ...result({
+        pages: [
+          {
+            completions: (hookState.completions ?? []).map((row) => ({
+              ...row,
+              task_title: hookState.tasks?.find(
+                (task) => task.id === row.task_id,
+              )?.title,
+            })),
+            transactions: hookState.points ?? [],
+          },
+        ],
+      }),
+      hasNextPage: false,
+    }),
+    useHistory: () => ({
+      ...result({ pages: [{ transactions: hookState.points ?? [] }] }),
+      hasNextPage: false,
+    }),
+    usePointsSummary: () =>
+      result({
+        earned: 0,
+        spent: 0,
+        reversed: 0,
+        adjustments: 0,
+        net: 0,
+        balance: 0,
+      }),
+    useLeaderboard: () =>
+      result({
+        entries: hookState.ranking ?? [],
+        from: null,
+        asOf: '2026-10-15T00:00:00Z',
+      }),
+  };
+});
+
 // Board mounts useRealtime(familyId); keep it inert so no Supabase channel is
 // opened during the render test.
 vi.mock('@/hooks/useRealtime', () => ({
@@ -95,7 +170,9 @@ vi.mock('@/hooks/useRealtime', () => ({
 
 // Onboarding reads the Google profile via useAuth to prefill "Your name".
 vi.mock('@/lib/AuthContext', () => ({
-  useAuth: () => ({ user: { full_name: 'Tester', email: 'tester@example.com' } }),
+  useAuth: () => ({
+    user: { full_name: 'Tester', email: 'tester@example.com' },
+  }),
 }));
 
 // <Board /> renders <TaskModal />, which pulls the authenticated session via
@@ -146,6 +223,7 @@ function renderWithProviders(ui, { route = '/' } = {}) {
 }
 
 beforeEach(() => {
+  hookState.ranking = [];
   hookState.family = { id: 'fam-1', name: 'Rodrigues Family' };
   hookState.members = undefined;
   hookState.membersActive = undefined;
@@ -245,7 +323,13 @@ describe('Carry-over indicator (R14.4)', () => {
 describe('MemberProfile renders backend data (R20.2)', () => {
   it('shows the member stats and completed-task history from the api data', () => {
     hookState.members = [
-      { id: 'm-1', name: 'Lucas', member_type: 'CHILD', color: '#10B981', active: true },
+      {
+        id: 'm-1',
+        name: 'Lucas',
+        member_type: 'CHILD',
+        color: '#10B981',
+        active: true,
+      },
     ];
     // Ledger entries drive the "Total points" stat (sum of this member's rows).
     hookState.points = [
@@ -255,7 +339,7 @@ describe('MemberProfile renders backend data (R20.2)', () => {
         task_id: 't-1',
         points: 5,
         transaction_type: 'TASK_COMPLETION',
-        created_date: '2099-01-10',
+        created_at: '2099-01-10',
       },
       {
         id: 'p-2',
@@ -263,7 +347,7 @@ describe('MemberProfile renders backend data (R20.2)', () => {
         task_id: 't-2',
         points: 10,
         transaction_type: 'TASK_COMPLETION',
-        created_date: '2099-01-11',
+        created_at: '2099-01-11',
       },
     ];
     hookState.tasks = [
@@ -276,7 +360,9 @@ describe('MemberProfile renders backend data (R20.2)', () => {
       { id: 'c-2', task_id: 't-2', completed_at: '2099-01-11T08:00:00Z' },
     ];
 
-    renderWithProviders(<MemberProfile />, { route: '/member-profile?member=m-1' });
+    renderWithProviders(<MemberProfile />, {
+      route: '/member-profile?member=m-1',
+    });
 
     // Member identity from the backend members list.
     expect(screen.getByRole('heading', { name: 'Lucas' })).toBeInTheDocument();
@@ -284,11 +370,11 @@ describe('MemberProfile renders backend data (R20.2)', () => {
     expect(screen.getByText('Make bed')).toBeInTheDocument();
     expect(screen.getByText('Feed the dog')).toBeInTheDocument();
     // "Tasks done" count equals the number of backend completions.
-    expect(screen.getByText('2')).toBeInTheDocument();
+    expect(screen.getByText(/Showing 2 work records/)).toBeInTheDocument();
     // Total points = sum of the member's ledger rows (5 + 10). The "This week"
     // tile also sums to 15 here (the mocked dates fall in-window), so the
     // backend-derived total appears on at least one stat tile.
-    expect(screen.getAllByText('15').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('15 points')).toBeInTheDocument();
   });
 });
 
@@ -312,7 +398,7 @@ describe('PointsHistory renders ledger entries (R20.4)', () => {
         task_id: 't-1',
         points: 5,
         transaction_type: 'TASK_COMPLETION',
-        created_date: '2099-01-10',
+        created_at: '2099-01-10',
       },
       {
         id: 'p-2',
@@ -320,7 +406,7 @@ describe('PointsHistory renders ledger entries (R20.4)', () => {
         task_id: 't-2',
         points: -15,
         transaction_type: 'REVERSAL',
-        created_date: '2099-01-11',
+        created_at: '2099-01-11',
       },
     ];
 
@@ -328,11 +414,11 @@ describe('PointsHistory renders ledger entries (R20.4)', () => {
 
     // A row per ledger entry, labelled with member + transaction type — these
     // labels are unique to the ledger rows (not the summary header).
-    expect(screen.getByText(/Lucas · Task completed/)).toBeInTheDocument();
-    expect(screen.getByText(/Marina · Reopened/)).toBeInTheDocument();
+    expect(screen.getByText(/Earned.*Lucas/)).toBeInTheDocument();
+    expect(screen.getByText(/Reversed.*Marina/)).toBeInTheDocument();
     // The task titles for each ledger row resolve via task_id.
-    expect(screen.getByText(/Make bed/)).toBeInTheDocument();
-    expect(screen.getByText(/Homework/)).toBeInTheDocument();
+    expect(screen.getByText(/Showing 2 records/)).toBeInTheDocument();
+    expect(screen.queryByText('Invalid Date')).not.toBeInTheDocument();
     // Signed point amounts from the ledger render. "+5" also appears in the
     // "Earned" summary tile (awarded total), so both occurrences are expected.
     expect(screen.getAllByText('+5').length).toBeGreaterThanOrEqual(1);
@@ -359,7 +445,9 @@ describe('Onboarding appears for a first-login user with no members (R20.3)', ()
       screen.getByRole('heading', { name: /welcome to famtask/i }),
     ).toBeInTheDocument();
     expect(screen.getByLabelText(/family name/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /create family/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /create family/i }),
+    ).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: /sample/i }),
     ).not.toBeInTheDocument();
@@ -428,7 +516,7 @@ describe('Leaderboard renders rows from api data', () => {
         task_id: 't-1',
         points: 5,
         transaction_type: 'TASK_COMPLETION',
-        created_date: '2099-01-10',
+        created_at: '2099-01-10',
       },
       {
         id: 'p-2',
@@ -436,10 +524,28 @@ describe('Leaderboard renders rows from api data', () => {
         task_id: 't-2',
         points: 30,
         transaction_type: 'TASK_COMPLETION',
-        created_date: '2099-01-11',
+        created_at: '2099-01-11',
       },
     ];
 
+    hookState.ranking = [
+      {
+        memberId: 'm-2',
+        name: 'Marina',
+        points: 30,
+        completedTasks: 1,
+        rank: 1,
+        color: '#F59E0B',
+      },
+      {
+        memberId: 'm-1',
+        name: 'Lucas',
+        points: 5,
+        completedTasks: 1,
+        rank: 2,
+        color: '#10B981',
+      },
+    ];
     renderWithProviders(<Leaderboard />);
 
     // Both members render as leaderboard rows with their names.

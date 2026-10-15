@@ -1,3 +1,4 @@
+import { memberViewRoutes } from './modules/member-views/views.routes.js';
 /**
  * Fastify composition root.
  *
@@ -138,6 +139,10 @@ export function buildApp(): FastifyInstance {
           Object.entries(value)
             .filter(
               ([key]) =>
+                !(
+                  request.routeOptions.url === '/api/v1/family/awards' &&
+                  key === 'family_id'
+                ) &&
                 ![
                   'created_by_user_id',
                   'created_by_app_user_id',
@@ -274,6 +279,7 @@ function registerRoutes(app: FastifyInstance): void {
       // desc; an invalid `period` → `422` (R10.1, R15.1–R15.5). Task 10.2 adds
       // awards CRUD + redeem to this same module without changing app.ts.
       gamificationRoutes(apiV1);
+      memberViewRoutes(apiV1);
 
       // Dashboard & board: `GET /api/v1/family/dashboard` and
       // `GET /api/v1/family/board?weekStart` (task 11.1). The dashboard returns

@@ -13,6 +13,7 @@ export default function ProtectedRoute({
     access,
     authError,
     logout,
+    retryAccessResolution,
   } = useAuth();
   const location = useLocation();
   if (authError && isAuthenticated)
@@ -29,30 +30,45 @@ export default function ProtectedRoute({
     ['NO_ACCESS', 'REVOKED', 'PAYMENT_REQUIRED'].includes(access.state)
   )
     return <Navigate replace to={accessDestination(access)} />;
-  if (
-    access.membership?.role === 'MEMBER' &&
-    accessDestination(access, location.pathname + location.search) !==
-      location.pathname + location.search
-  )
-    return (
-      <Navigate
-        replace
-        to={accessDestination(access, location.pathname + location.search)}
-      />
-    );
-  if (access.membership?.role === 'MEMBER')
-    return (
-      <AccessNotice
-        title="Family access connected"
-        detail={
-          new URLSearchParams(location.search).get('accessMessage') === 'member'
-            ? 'Your role does not allow that page. You were returned to home. Your member dashboard will be available with the member experience feature.'
-            : 'Your member dashboard will be available with the member experience feature.'
-        }
-      >
-        <button onClick={logout}>Sign out</button>
-      </AccessNotice>
-    );
+  if (access.membership?.role === 'MEMBER') {
+    if (!access.membership.memberId)
+      return (
+        <AccessNotice
+          title="Could not resolve participant access"
+          detail="Retry access resolution or contact your family manager."
+        >
+          <button onClick={retryAccessResolution}>Retry access</button>
+          <button onClick={logout}>Sign out</button>
+        </AccessNotice>
+      );
+    if (!access.capabilities?.includes('member:views'))
+      return (
+        <AccessNotice
+          title="Member views unavailable"
+          detail="Your family access is connected. Member views are currently disabled."
+        >
+          <button onClick={logout}>Sign out</button>
+        </AccessNotice>
+      );
+    const allowed = new Set([
+      '/',
+      '/board',
+      '/leaderboard',
+      '/wall',
+      '/points-history',
+      '/member-profile',
+      '/family-awards',
+    ]);
+    if (!allowed.has(location.pathname))
+      return (
+        <AccessNotice
+          title="Page unavailable for your role"
+          detail="You can view your dashboard, shared board and personal history."
+        >
+          <a href="/">Home</a>
+        </AccessNotice>
+      );
+  }
   if (
     access.state === 'ONBOARDING_REQUIRED' &&
     access.membership?.role !== 'OWNER'

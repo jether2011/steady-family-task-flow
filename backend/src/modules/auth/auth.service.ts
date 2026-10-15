@@ -1,3 +1,4 @@
+import { env } from '../../config/env.js';
 import { resolveMembership } from '../access/access.service.js';
 import { loadFamilyAndResponsible } from '../family/family.repository.js';
 import type { AuthClaims } from '../../middleware/types.js';
@@ -56,6 +57,7 @@ export async function bootstrapMe(
     capabilities:
       m.role === 'MEMBER'
         ? [
+            ...(env.MEMBER_VIEWS_ENABLED ? ['member:views'] : []),
             'family:read',
             'board:read',
             'points:self',

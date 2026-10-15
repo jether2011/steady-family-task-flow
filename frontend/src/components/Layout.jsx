@@ -68,9 +68,18 @@ function MobileNavItem({ to, label, icon: Icon, end }) {
 }
 
 export default function Layout() {
-  const { data: family, isLoading } = useFamily();
+  const { data: family, isLoading, isError, refetch } = useFamily();
   const { logout, access } = useAuth();
 
+  const member = access?.membership?.role === 'MEMBER';
+  const visibleNav = member
+    ? navItems
+        .filter(
+          (item) =>
+            !['/members', '/settings', '/task-templates'].includes(item.to),
+        )
+        .concat({ to: '/member-profile', label: 'My profile', icon: Users })
+    : navItems;
   if (isLoading) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-background">
@@ -79,8 +88,15 @@ export default function Layout() {
     );
   }
 
-  // The family row always exists after login (auto-created by GET /me), so the
-  // gate is "has the user finished onboarding?", not "does a family exist?".
+  if (isError)
+    return (
+      <div role="alert" className="p-8">
+        <p>Could not load family information.</p>
+        <button onClick={() => refetch()}>Retry</button>
+      </div>
+    );
+  // Access resolution identifies an existing family; owner profile setup
+  // must finish before the management application can open.
   // Until relationship + responsible_name are set, send the user to onboarding.
   if (!isFamilyConfigured(family) && access?.membership?.role === 'OWNER') {
     return <Navigate to="/onboarding" replace />;
@@ -101,13 +117,13 @@ export default function Layout() {
                 FamTask
               </h1>
               <p className="text-xs text-muted-foreground mt-1 truncate max-w-[150px]">
-                {family.name}
+                {family?.name ?? access?.family?.name}
               </p>
             </div>
           </div>
         </div>
         <nav className="flex-1 px-3 space-y-1">
-          {navItems.map((item) => (
+          {visibleNav.map((item) => (
             <NavItem key={item.to} {...item} />
           ))}
         </nav>
@@ -154,7 +170,7 @@ export default function Layout() {
 
         <nav className="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-card/95 backdrop-blur border-t border-border">
           <div className="flex overflow-x-auto no-scrollbar">
-            {navItems.map((item) => (
+            {visibleNav.map((item) => (
               <MobileNavItem key={item.to} {...item} />
             ))}
           </div>

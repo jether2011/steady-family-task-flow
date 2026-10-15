@@ -1,3 +1,4 @@
+import { readView, type ViewContext } from '../member-views/views.service.js';
 /**
  * Leaderboard service — the ledger-sum ranking behind
  * `GET /family/leaderboard` (task 10.1).
@@ -117,6 +118,56 @@ export async function leaderboard(
     })
     .sort(
       (a, b) =>
-        b.points - a.points || b.completedTasks - a.completedTasks,
+        b.points - a.points ||
+        b.completedTasks - a.completedTasks ||
+        a.memberId.localeCompare(b.memberId),
     );
+}
+
+export interface RankedEntry {
+  memberId: string;
+  name: string;
+  avatarUrl: string | null;
+  color: string | null;
+  points: number;
+  completedTasks: number;
+  rank: number;
+}
+export function rankEntries(
+  entries: Omit<RankedEntry, 'rank'>[],
+): RankedEntry[] {
+  const sorted = [...entries].sort(
+    (a, b) =>
+      b.points - a.points ||
+      b.completedTasks - a.completedTasks ||
+      a.memberId.localeCompare(b.memberId),
+  );
+  let rank = 0;
+  return sorted.map((entry, index) => {
+    const prior = sorted[index - 1];
+    if (
+      !prior ||
+      entry.points !== prior.points ||
+      entry.completedTasks !== prior.completedTasks
+    )
+      rank = index + 1;
+    return { ...entry, rank };
+  });
+}
+export async function leaderboardSnapshot(
+  ctx: ViewContext,
+  period: LeaderboardPeriod,
+  now = new Date(),
+) {
+  const from = periodStart(period, now);
+  const result = await readView<{
+    entries: Omit<RankedEntry, 'rank'>[];
+    asOf: string;
+  }>(ctx, 'leaderboard', { from });
+  return {
+    entries: rankEntries(result.entries),
+    period,
+    from,
+    asOf: result.asOf,
+  };
 }

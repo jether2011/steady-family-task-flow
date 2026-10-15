@@ -80,6 +80,7 @@ The schema lives in `src/supabase/migrations/` as plain SQL, applied in numeric 
 | `005_realtime.sql` | Adds tables to the `supabase_realtime` publication |
 | `006_update_family.sql` | Atomic family/responsible-user update function |
 | `007_membership_access.sql` | Canonical identities, owner backfill, memberships, transactional authorization and role policies |
+| `008_member_views.sql` | Snapshot member reads, safe directory/profile, aggregate ranking, history indexes |
 | `seed.sql` | Idempotent demo family data |
 
 Apply them with any of these:
@@ -230,3 +231,5 @@ Vercel targets serverless/static workloads and does not keep a long-lived Fastif
 - CORS errors in the browser: CORS_ORIGIN must list the frontend's exact origin (scheme + host + port, no trailing slash).
 - /api/v1/ready returns 503: the backend cannot reach Supabase - check SUPABASE_URL and network egress.
 - `GET`/`PATCH /family` returns 404 right after login: `GET /me` has not run yet, so the family row doesn't exist. Call `/me` first (the frontend does this automatically).
+
+Member APIs, paginated history and rollout: [specification 03 guide](../docs/implementation/03-member-dashboard-rollout.md). Enable backend `MEMBER_VIEWS_ENABLED` only after migration 008 and staging acceptance.

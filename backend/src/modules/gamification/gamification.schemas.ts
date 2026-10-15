@@ -105,6 +105,8 @@ export const PointsTransactionDTOSchema = z.object({
 
 /** A task-completion row as serialized by the member-completions route. */
 export const TaskCompletionDTOSchema = z.object({
+  task_title: z.string().nullable().optional(),
+  awarded_points: z.number().optional(),
   id: z.string().uuid(),
   task_id: z.string().uuid(),
   family_id: z.string().uuid(),
@@ -116,6 +118,8 @@ export const TaskCompletionDTOSchema = z.object({
 
 /** One leaderboard entry: `{ memberId, name, color, points, completedTasks }`. */
 export const LeaderboardEntrySchema = z.object({
+  avatarUrl: z.string().nullable(),
+  rank: z.number().int().positive(),
   memberId: z.string().uuid(),
   name: z.string(),
   color: z.string().nullable(),
@@ -130,6 +134,9 @@ export const PointsListResponse = z.object({
 
 /** `GET /family/leaderboard` 200 envelope: `{ entries }` (R15.1). */
 export const LeaderboardResponse = z.object({
+  period: z.enum(LEADERBOARD_PERIOD_VALUES),
+  from: z.string().nullable(),
+  asOf: z.string(),
   entries: z.array(LeaderboardEntrySchema),
 });
 
@@ -232,7 +239,7 @@ export type RedeemInput = z.infer<typeof Redeem>;
 /** An award record as serialized by the awards routes. */
 export const AwardDTOSchema = z.object({
   id: z.string().uuid(),
-  family_id: z.string().uuid(),
+  family_id: z.string().uuid().optional(),
   title: z.string(),
   description: z.string().nullable(),
   points_cost: z.number().int(),

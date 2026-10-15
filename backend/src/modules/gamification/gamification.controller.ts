@@ -18,7 +18,6 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import { requireFamilyContext } from '../../middleware/context.js';
 import type {
   AwardDTO,
-  LeaderboardEntry,
   PointsTransactionDTO,
 } from '../../shared/types/index.js';
 import {
@@ -26,7 +25,7 @@ import {
   memberCompletions,
   type MemberCompletionsPayload,
 } from './points.service.js';
-import { leaderboard } from './leaderboard.service.js';
+import { leaderboardSnapshot } from './leaderboard.service.js';
 import {
   createAwardForFamily,
   deactivateAwardForFamily,
@@ -67,10 +66,11 @@ export async function listPointsHandler(
 export async function leaderboardHandler(
   request: FastifyRequest<{ Querystring: LeaderboardQueryInput }>,
   _reply: FastifyReply,
-): Promise<{ entries: LeaderboardEntry[] }> {
-  const { familyId } = requireFamilyContext(request);
-  const entries = await leaderboard({ familyId }, request.query.period);
-  return { entries };
+) {
+  return leaderboardSnapshot(
+    requireFamilyContext(request),
+    request.query.period,
+  );
 }
 
 /**
@@ -117,11 +117,18 @@ export async function createAwardHandler(
 /** `PATCH /api/v1/awards/:id` → `{ award }` (R18.3; foreign/missing id → 404,
  * R18.10). Matches the frontend `awards.api.update` envelope. */
 export async function updateAwardHandler(
-  request: FastifyRequest<{ Params: AwardIdParamsInput; Body: AwardUpdateInput }>,
+  request: FastifyRequest<{
+    Params: AwardIdParamsInput;
+    Body: AwardUpdateInput;
+  }>,
   _reply: FastifyReply,
 ): Promise<{ award: AwardDTO }> {
   const { familyId } = requireFamilyContext(request);
-  const award = await updateAwardForFamily({ familyId }, request.params.id, request.body);
+  const award = await updateAwardForFamily(
+    { familyId },
+    request.params.id,
+    request.body,
+  );
   return { award };
 }
 
@@ -153,7 +160,11 @@ export async function redeemAwardHandler(
   reply: FastifyReply,
 ): Promise<{ transaction: PointsTransactionDTO }> {
   const { familyId } = requireFamilyContext(request);
-  const transaction = await redeem({ familyId }, request.params.id, request.body.memberId);
+  const transaction = await redeem(
+    { familyId },
+    request.params.id,
+    request.body.memberId,
+  );
   void reply.code(201);
   return { transaction };
 }

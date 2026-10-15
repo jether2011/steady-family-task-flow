@@ -33,8 +33,6 @@ import {
   deleteAwardHandler,
   leaderboardHandler,
   listAwardsHandler,
-  listPointsHandler,
-  memberCompletionsHandler,
   redeemAwardHandler,
   updateAwardHandler,
 } from './gamification.controller.js';
@@ -46,10 +44,6 @@ import {
   AwardsResponse,
   LeaderboardQuery,
   LeaderboardResponse,
-  MemberCompletionsParams,
-  MemberCompletionsResponse,
-  PointsListResponse,
-  PointsQuery,
   Redeem,
   RedeemResponse,
 } from './gamification.schemas.js';
@@ -64,18 +58,6 @@ export function gamificationRoutes(app: FastifyInstance): void {
 
   typed.route({
     method: 'GET',
-    url: '/family/points',
-    schema: {
-      querystring: PointsQuery,
-      response: {
-        200: PointsListResponse,
-      },
-    },
-    handler: listPointsHandler,
-  });
-
-  typed.route({
-    method: 'GET',
     url: '/family/leaderboard',
     schema: {
       querystring: LeaderboardQuery,
@@ -84,18 +66,6 @@ export function gamificationRoutes(app: FastifyInstance): void {
       },
     },
     handler: leaderboardHandler,
-  });
-
-  typed.route({
-    method: 'GET',
-    url: '/family/members/:id/completions',
-    schema: {
-      params: MemberCompletionsParams,
-      response: {
-        200: MemberCompletionsResponse,
-      },
-    },
-    handler: memberCompletionsHandler,
   });
 
   // Awards CRUD + redemption (task 10.2). Collection paths live under

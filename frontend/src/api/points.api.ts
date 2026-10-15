@@ -22,6 +22,7 @@ import type {
 
 interface TransactionsEnvelope {
   transactions: PointsTransaction[];
+  nextCursor?: string | null;
 }
 
 /**
@@ -33,12 +34,18 @@ export async function list(
   filter: PointsFilter = {},
   signal?: AbortSignal,
 ): Promise<PointsTransaction[]> {
-  const res = await get<TransactionsEnvelope>(
-    '/family/points',
-    { ...filter },
-    signal,
-  );
-  return res.transactions;
+  const transactions: PointsTransaction[] = [];
+  let cursor: string | undefined;
+  do {
+    const res = await get<TransactionsEnvelope>(
+      '/family/points',
+      { ...filter, ...(cursor ? { cursor } : {}) },
+      signal,
+    );
+    transactions.push(...res.transactions);
+    cursor = res.nextCursor ?? undefined;
+  } while (cursor);
+  return transactions;
 }
 
 /**
