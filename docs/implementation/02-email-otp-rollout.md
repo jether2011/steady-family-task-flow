@@ -8,7 +8,7 @@ Branch: `codex/email-otp-login`, based on specification 01. No new OTP endpoint,
 
 Supabase authenticates and issues sessions. `/me` independently resolves the stable provider subject and verified mailbox to a manager-assigned membership. Google and OTP use the same resolution. Unknown sign-ins never create a family. Identity conflicts show a generic recovery message, never household identity or provider account-existence details.
 
-Protected destinations return through a validated local `returnTo`. Unknown paths, external/protocol-relative addresses, login loops and member management destinations are rejected. Dedicated no-access, revoked and access-error pages support retry or change account. Incomplete owners go to onboarding; subscription state goes to a placeholder until the SaaS specification. Member dashboards remain specification 03.
+Protected destinations return through a validated local `returnTo`. Unknown paths, external/protocol-relative addresses, login loops and member management destinations are rejected. Dedicated no-access, revoked and access-error pages support retry or change account. Incomplete owners go to onboarding; unpaid drafts go to the merged owner subscription flow. Member dashboards are supplied by the merged specification 03.
 
 Session transitions cancel prior `/me` work and family queries. Concurrent resolution for the same session deduplicates while active. Logout, expired authentication and failed resolution clear protected state. 401 responses return to neutral login once, without starting Google OAuth. Old-account responses cannot sign out the new account. Revocation responses clear protected queries and resolve current membership again. Late OTP results after logout/change-email cannot restore family access.
 

@@ -1,6 +1,6 @@
 # Specification 2: Email OTP login
 
-Date: 2026-10-11 · Status: Design draft · Branch: `codex/email-otp-login`
+Date: 2026-10-11 · Status: Implemented and merged; provider/policy rollout remains gated · Branch: `codex/email-otp-login`
 
 Depends on [membership foundation](01-tenant-membership-roles.md). Source: [PRD](../product/PRD-family-access-and-saas.md); [shared conventions](README.md).
 

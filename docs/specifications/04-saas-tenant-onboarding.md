@@ -1,6 +1,6 @@
 # Specification 4: Explicit SaaS tenant onboarding
 
-Date: 2026-10-11 · Status: Implemented; rollout disabled pending specifications 5/6 · Branch: `codex/saas-tenant-onboarding`
+Date: 2026-10-11 · Status: Implemented and merged; provider/policy rollout remains gated · Branch: `codex/saas-tenant-onboarding`
 
 Depends on [membership foundation](01-tenant-membership-roles.md); email login improves signup but is not required to implement this branch. Source: [PRD](../product/PRD-family-access-and-saas.md); [shared conventions](README.md).
 
@@ -63,7 +63,7 @@ Database/browser policies must prohibit ordinary reads/writes to self-service DR
 1. NO_ACCESS screen explains no family access and shows Create a family when eligible and signup flag allows it.
 2. Owner provides family name, own display name and relationship. Label “Relationship to the family” rather than implying descriptive relationship is access role.
 3. Submit once with stable request key; maintain key through network retry. Refresh/relogin resumes the server draft through `/me` and onboarding GET.
-4. Completed profile leads to `/subscribe`; checkout UI is a placeholder until specification 5 ships. Never open manager dashboard on profile submission alone.
+4. Completed profile leads to `/subscribe`; the merged specification 5 Checkout UI is available when configured and enabled. Never open manager dashboard on profile submission alone.
 5. Successful activation returns the same family and owner context; add-member/task empty states are the existing workflows.
 
 Use auth identity display-name prefill only as optional editable text. Form/loading/error/disabled/retry states are accessible and mobile-compatible. Store no auth tokens or payment state in draft form persistence. A route deep link cannot bypass the lifecycle gate. Returning from an unfinished signup does not prompt unnecessary new family creation.

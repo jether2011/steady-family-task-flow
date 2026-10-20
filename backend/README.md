@@ -10,6 +10,8 @@ A Node.js + TypeScript REST API built on Fastify 5, backed by a hosted Supabase 
 > Explicit owner creation uses `POST /api/v1/families`; unpaid drafts remain
 > behind the onboarding/subscription boundary. See the [tenant rollout guide](../docs/implementation/04-tenant-onboarding-rollout.md).
 
+Current operator instructions: [platform setup](../docs/setup/platform.md), [tenant provisioning](../docs/setup/tenants.md), [Stripe setup](../docs/setup/stripe.md), and the [complete environment reference](../docs/setup/environment.md).
+
 ## Tech stack
 
 - Node 20, ESM, strict TypeScript (NodeNext)
@@ -56,6 +58,8 @@ The server fails fast with a clear, secret-free error if any required env var is
 
 `.env` is git-ignored and is never baked into the Docker image.
 
+The table above covers core values only. Membership, signup, Stripe, entitlement policy and delivery settings are documented in the [complete environment reference](../docs/setup/environment.md). API and worker must use matching configuration.
+
 ## npm scripts
 
 | Script | What it does |
@@ -65,6 +69,8 @@ The server fails fast with a clear, secret-free error if any required env var is
 | `npm start` | Run the compiled server (`node dist/server.js`) |
 | `npm test` | Run the Vitest suite |
 | `npm run typecheck` | Type-check without emitting |
+| `npm run worker:dev` | Run the durable billing/entitlement worker in development |
+| `npm run worker` | Run the compiled supervised worker |
 
 ## Database migrations
 
@@ -85,14 +91,18 @@ The schema lives in `src/supabase/migrations/` as plain SQL, applied in numeric 
 | `011_subscription_entitlements.sql` | Versioned access projection, strict write enforcement, bounded rollout and read-only recovery |
 | `seed.sql` | Idempotent demo family data |
 
-Apply them with any of these:
+For a fresh database, apply them with one of these methods. For an existing database, apply only pending files according to your deployment ledger:
 
 - Dashboard SQL Editor: paste each file in order and run.
-- Supabase CLI: `supabase db push` (if you manage migrations via the CLI) or run files with `supabase db execute`.
+- If you use a Supabase CLI migration workflow, first integrate these files into that tracked workflow. This repository keeps SQL under `src/supabase/migrations/`; it does not provide a standard `supabase/migrations/` project for an unconfigured `supabase db push`.
 - psql against the connection string from Project Settings -> Database:
 
 ```bash
-for f in src/supabase/migrations/0*.sql; do psql "$DATABASE_URL" -f "$f"; done
+(
+  for f in src/supabase/migrations/0*.sql; do
+    psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f" || exit 1
+  done
+)
 psql "$DATABASE_URL" -f src/supabase/seed.sql    # optional demo data
 ```
 
@@ -100,15 +110,24 @@ Apply migrations once in order using a migration ledger. Migration 007 is intent
 
 ## API routes
 
-All routes are under `/api/v1` and (except the ops probes) require a
+All routes are under `/api/v1` and (except ops probes and the Stripe-signature-authenticated webhook) require a
 `Authorization: Bearer <supabase-jwt>` header. Identity and `family_id` are
 always derived from the verified session — never from the request body.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| GET | `/me` | Bootstrap + fetch the profile and family (creates them on first call) |
+| GET | `/me` | Resolve verified identity, membership, role, routing and entitlement; never creates a tenant |
+| POST | `/families` | Explicit eligible tenant creation with UUID Idempotency-Key |
+| GET / PATCH | `/family/onboarding` | Owner profile recovery/setup for the same tenant |
+| GET | `/billing/plan` | Owner plan/configuration availability |
+| GET | `/billing/subscription` | Owner subscription and recovery state |
+| POST | `/billing/checkout` | Owner hosted checkout with idempotency |
+| GET | `/billing/checkout/:attemptId` | Owner activation/attempt status |
+| POST | `/billing/portal` | Owner hosted payment recovery |
+| POST | `/billing/webhooks/stripe` | Raw signed Stripe event ingestion, no bearer token |
+| POST | `/family/members/:id/access/revoke` | Narrow versioned login revocation, including read-only tenants |
 | GET | `/family` | Fetch the composed family DTO |
-| PATCH | `/family` | Update family name / avatar / responsible name / relationship (onboarding) |
+| PATCH | `/family` | Update established family settings (owner draft setup uses /family/onboarding) |
 | GET | `/family/members` | List members (`?active=true` to filter) |
 | POST | `/family/members` | Create a member |
 | PATCH | `/family/members/:id` | Update a member (incl. toggling `active`) |
@@ -152,11 +171,13 @@ By default the database-backed integration and property suites skip gracefully (
 
 ```bash
 docker run --rm -d -p 55432:5432 -e POSTGRES_PASSWORD=pg --name ftb-pg postgres:16-alpine
+SUPABASE_URL=https://project.supabase.co SUPABASE_PUBLISHABLE_KEY=test \
+SUPABASE_SECRET_KEY=test CORS_ORIGIN=http://localhost:5173 \
 TEST_DATABASE_URL=postgresql://postgres:pg@127.0.0.1:55432/postgres npm test
 docker rm -f ftb-pg
 ```
 
-The DB-backed suites rebuild the schema per run and are serialized (see `vitest.config.ts`) so they do not race on the shared database.
+Never use a customer or shared environment database for `TEST_DATABASE_URL`; the harness drops schemas. The DB-backed suites rebuild the schema per run and are serialized (see `vitest.config.ts`) so they do not race on the shared database.
 
 ## Build and run with Docker
 
@@ -168,6 +189,8 @@ docker run --rm -p 8080:8080 --env-file .env ftb-backend
 ```
 
 ## Deployment
+
+SaaS billing also requires a separate supervised `npm run worker` process using the same built image and configuration (container command `node dist/billing-worker.js`). The API process alone does not reconcile subscriptions or activate tenants. See [Stripe deployment](../docs/setup/stripe.md).
 
 The backend is a long-running HTTP server, so host it somewhere that keeps a process alive (a container host, Heroku dyno, or VPS). Before deploying anywhere: finish the Supabase setup and apply the migrations, then set the env vars on the host. After the frontend is live, set `CORS_ORIGIN` to the frontend's public origin and add that origin to the Supabase Auth URL configuration.
 
@@ -232,7 +255,7 @@ Vercel targets serverless/static workloads and does not keep a long-lived Fastif
 - 401 on every request: the frontend is sending no/expired token, or the Supabase project URL does not match the one that issued the JWT.
 - CORS errors in the browser: CORS_ORIGIN must list the frontend's exact origin (scheme + host + port, no trailing slash).
 - /api/v1/ready returns 503: the backend cannot reach Supabase - check SUPABASE_URL and network egress.
-- `GET`/`PATCH /family` returns 404 without an active membership; `/me` reports NO_ACCESS or REVOKED. Draft product access returns 403; owners use `/family/onboarding` to resume setup. Login does not create a family.
+- `GET`/`PATCH /family` returns 404 without an active membership; `/me` reports NO_ACCESS or REVOKED. Draft product access returns `403 SUBSCRIPTION_REQUIRED`; owners use `/family/onboarding` to resume setup. Login does not create a family.
 
 Member APIs, paginated history and rollout: [specification 03 guide](../docs/implementation/03-member-dashboard-rollout.md). Enable backend `MEMBER_VIEWS_ENABLED` only after migration 008 and staging acceptance.
 

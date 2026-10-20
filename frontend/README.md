@@ -14,10 +14,13 @@ A React 18 single-page app (Vite + Tailwind + TanStack Query) for the Family Tas
 
 ## User flow
 
-1. The app is gated by `ProtectedRoute`: while the Supabase session resolves it shows a loader, and with no session it redirects to `/login` with validated local returnTo. Google and optional email code choices are available there.
-2. On login, `AuthContext` calls `GET /api/v1/me` before rendering family pages to resolve role and access. Resolution never creates a family; unknown and revoked accounts see a dedicated access notice. Resolution repeats on focus and every 30 seconds, clearing cached family data when scope changes.
-3. `Layout` sends the user to `/onboarding` until the family is configured (helper `isFamilyConfigured` in `src/lib/familyUtils.js`: both `relationship` and `responsible_name` set). Onboarding submits name + your name + role via `PATCH /family`, then routes to the dashboard. There is no "load sample data" option — the flow is fully manual.
-4. From there: Members (CRUD), Board/Dashboard (create, assign, move, complete tasks), Leaderboard, Awards (create + redeem), Templates, History, and Wall Mode.
+1. `/login` offers Google and enabled email OTP; protected routes retain a validated local return destination.
+2. `AuthContext` resolves `/api/v1/me` before mounting tenant pages. Login never creates a family. Identity/role/membership/entitlement changes clear cached tenant data; resolution repeats on focus and every 30 seconds.
+3. Eligible unassociated users explicitly create a family when signup is enabled. Owners resume incomplete profiles at `/onboarding` through `/family/onboarding`; saved unpaid drafts go to `/subscribe`.
+4. Owner Checkout/portal flows use server-supplied commercial settings. A return URL waits for verified worker activation rather than granting access.
+5. Owners/Managers get permitted management actions; Members get personal history/points and authorized shared views. Established expired families retain read-only views, owner payment recovery and narrow manager revocation.
+
+Current setup: [platform](../docs/setup/platform.md), [tenants and roles](../docs/setup/tenants.md), [Stripe](../docs/setup/stripe.md), [environment reference](../docs/setup/environment.md).
 
 ### Create-payload convention
 
@@ -53,6 +56,8 @@ All frontend variables are build-time (Vite `import.meta.env.VITE_*`) and are ba
 | `VITE_API_URL` | yes | Base URL of the backend as seen by the browser (e.g. `http://localhost:8080` or your API domain) |
 | `VITE_SUPABASE_URL` | yes | Supabase project URL |
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | yes | Supabase publishable (public) key `sb_publishable_...` - safe to ship to the browser |
+| `VITE_EMAIL_OTP_ENABLED` | no | `false` by default; enable only after provider email setup |
+| `VITE_AUTH_CAPTCHA_SITE_KEY` | no | Public Turnstile site key; secret stays in Supabase |
 
 ## npm scripts
 
@@ -87,7 +92,7 @@ docker run --rm -p 5173:8080 ftb-frontend
 
 ## Deployment
 
-The frontend is static files, so any static host works. Whatever host you pick, set the three `VITE_*` values at build time, and afterward make sure the backend's `CORS_ORIGIN` and the Supabase Auth Site URL / redirect URLs include this app's public origin.
+The frontend is static files, so any static host works. Whatever host you pick, set the required `VITE_*` values and optional OTP/CAPTCHA values at build time, and afterward make sure the backend's `CORS_ORIGIN` and the Supabase Auth Site URL / redirect URLs include this app's public origin.
 
 ### Deploy to Vercel (recommended for the frontend)
 
@@ -126,7 +131,7 @@ docker push registry.heroku.com/your-ftb-frontend/web
 heroku container:release web -a your-ftb-frontend
 ```
 
-The nginx config already listens on `$PORT`/8080 and falls back to `index.html` for client-side routes.
+The included nginx listens on fixed port 8080 and falls back to `index.html` for client-side routes. A host that requires dynamic `$PORT` needs an adapted nginx template/entrypoint; the image does not substitute that variable automatically.
 
 ### Deploy to a VPS
 
@@ -157,7 +162,7 @@ From the repo root, `docker compose up -d --build` builds and runs the backend a
 - API calls fail with CORS errors: the backend's `CORS_ORIGIN` must include this app's exact origin.
 - Calls hit the wrong host, or 404s after refresh: `VITE_API_URL` was wrong at build time (rebuild to change it), or the static host is not falling back to `index.html` for SPA routes.
 - Env change had no effect: `VITE_*` are compile-time - rebuild/redeploy after changing them.
-- No family access after login: inspect `/me`; NO_ACCESS requires a provisioned verified mailbox, REVOKED requires manager action. New tenant creation is planned in specification 04.
+- No family access after login: inspect `/me`; NO_ACCESS may require provisioned membership or explicit creation when eligible/signup is enabled; REVOKED requires authorized recovery. Incomplete profiles use `/onboarding`, unpaid drafts use `/subscribe`, and Owners recover payment at `/billing`.
 - Create fails with `422 VALIDATION`: the request includes a server-derived field (`family_id`, `owner_id`, `active`, a task's `status`) or an empty string where a uuid/date is expected. Send only user-authored fields; use `null` for empty optionals.
 
 ## Email OTP login
@@ -168,7 +173,7 @@ Google remains available. Enable `VITE_EMAIL_OTP_ENABLED=true` after configuring
 
 ## Member dashboard and history
 
-The backend `member:views` capability enables the personal Home, shared board, own profile/history, rankings, awards catalog and view-only Wall. Owner/Manager retain management screens. All queries and optimistic mutations use the current app-user/family/role/access-version scope. History loads 50 records initially with explicit paging; summary cards use full-range server aggregates. Rankings use the server API, including UTC range labels and competition ranks. See the [member rollout guide](../docs/implementation/03-member-dashboard-rollout.md).
+The backend `member:views` capability enables the personal Home, shared board, own profile/history, rankings, awards catalog and view-only Wall. Owner/Manager retain authorized management screens; product controls become read-only when entitlement expires. All queries and optimistic mutations use the current app-user/family/role/membership-version/entitlement-version scope. History loads 50 records initially with explicit paging; summary cards use full-range server aggregates. Rankings use the server API, including UTC range labels and competition ranks. See the [member rollout guide](../docs/implementation/03-member-dashboard-rollout.md).
 
 Owner subscription, return and hosted portal flows: [specification 05 guide](../docs/implementation/05-stripe-billing-rollout.md). Commercial configuration is supplied by the backend; no Stripe key is required in the frontend.
 

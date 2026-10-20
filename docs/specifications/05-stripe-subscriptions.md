@@ -1,6 +1,6 @@
 # Specification 5: Stripe subscriptions
 
-Date: 2026-10-11 · Status: Implementation delivered; TEST-account and specification 6 release acceptance pending · Branch: `codex/stripe-subscriptions`
+Date: 2026-10-11 · Status: Implemented and merged; provider/policy rollout remains gated · Branch: `codex/stripe-subscriptions`
 
 Depends on [roles](01-tenant-membership-roles.md), [explicit onboarding](04-saas-tenant-onboarding.md), and approved merchant/plan settings. Source: [PRD](../product/PRD-family-access-and-saas.md); [shared conventions](README.md).
 

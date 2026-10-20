@@ -1,16 +1,18 @@
 # PRD: Family member access and subscription SaaS
 
-Version: 1.0 · Date: 2026-10-11 · Status: Draft for product review
+Version: 1.0 · Design date: 2026-10-11 · Implementation note updated: 2026-10-15
+
+All six associated specifications are implemented and merged. This PRD preserves the original discovery baseline and proposed product decisions; its baseline tables describe the application before those changes. For current behavior and configuration, use the [documentation index](../README.md) and [setup guides](../setup/platform.md). Provider acceptance and commercial policy remain deployment-specific.
 
 Product: Family Task Board / FamTask
 
 ## 1. Product intent
 
-Enable family members to sign in using a code sent to their email, reach the correct family, and use the permissions assigned by their manager. Turn each family into an isolated subscription tenant that a responsible adult can purchase and manage, with Stripe as the proposed billing provider.
+Enable family members to sign in using a code sent to their email, reach the correct family, and use the permissions assigned by their manager. Turn each family into an isolated subscription tenant that a responsible adult can purchase and manage, with Stripe as the implemented billing provider.
 
-This document defines product behavior and acceptance criteria. API contracts, database designs, detailed test plans, and implementation tasks belong in the subsequent feature specifications. No implementation or branch creation is part of this PRD stage.
+This document defines product behavior and acceptance criteria. API contracts, database designs, detailed test plans, and implementation tasks belong in the subsequent feature specifications. Implementation status is tracked in the [specification index](../specifications/README.md).
 
-The two requested capabilities are confirmed scope. Policies identified as **proposed** are product recommendations, not previously approved decisions. Commercial decisions in section 11 must be resolved before billing implementation or paid launch.
+The two requested capabilities are confirmed scope. Policies identified as **proposed** are product recommendations, not previously approved decisions. Commercial decisions in section 11 must be configured and approved before paid launch.
 
 ## 2. Repository findings and baseline
 
