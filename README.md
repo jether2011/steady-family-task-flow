@@ -1,196 +1,103 @@
 # Family Task Board
 
-A full-stack family chore and reward board. Parents create tasks, assign them to family members, and the app tracks completions, awards points, maintains a leaderboard, and lets members redeem rewards. It includes a landscape "Wall Mode" for a mounted kitchen display and real-time updates across devices.
+A multi-tenant SaaS for family tasks, points and rewards. Each household is a tenant with an Owner, optional Managers and read-only Members. Google and email-code authentication resolve the same server-managed memberships. Owners can create a household explicitly, subscribe through Stripe Checkout and manage payment through the hosted customer portal.
 
-The project is split into two independently deployable apps:
+All six access and SaaS specifications are merged. Feature switches remain disabled in the templates until the corresponding provider settings and deployment acceptance are complete. Merging code does not configure Supabase, Stripe or production policy.
 
-| App | Stack | What it does |
-| --- | --- | --- |
-| `backend/` | Node 20 - Fastify 5 - TypeScript - Supabase (PostgreSQL) | REST API, atomic points ledger, auth verification, OpenAPI docs |
-| `frontend/` | React 18 - Vite - Tailwind - TanStack Query | SPA UI, Google and optional email OTP, family board, Wall Mode |
+## Start here
 
-Both talk to a hosted Supabase project, which provides the PostgreSQL database, authentication (Google and optional email OTP), and row-level security.
+| Goal | Guide |
+| --- | --- |
+| Configure a fresh environment, authentication and deployment | [Platform setup](docs/setup/platform.md) |
+| Create a tenant, provision roles and understand restricted access | [Tenants and members](docs/setup/tenants.md) |
+| Configure Stripe, policy, worker and test purchases | [Stripe and subscriptions](docs/setup/stripe.md) |
+| Look up every environment variable | [Configuration reference](docs/setup/environment.md) |
+| API development, migrations and database tests | [Backend README](backend/README.md) |
+| UI development and static deployment | [Frontend README](frontend/README.md) |
+| Design and historical rollout evidence | [Documentation index](docs/README.md) |
 
----
+## Architecture
 
-## Architecture at a glance
+| Component | Responsibility |
+| --- | --- |
+| `frontend/` — React, Vite, TanStack Query | Login, tenant onboarding, role-aware boards/history and owner billing UI |
+| `backend/` — Fastify, TypeScript | Verify Supabase JWTs; resolve membership; enforce API permissions and privileged database operations |
+| Supabase — Auth and PostgreSQL | Google/email sessions, tenant data, RLS, atomic ledger and transaction-boundary authorization |
+| Billing/entitlement worker — separate Node process | Durable Stripe reconciliation, payment evidence, entitlement projection and activation receipts |
+| Stripe — hosted Checkout and portal | Payment collection, subscription and payment-method management |
 
-```
-          +--------------+     Bearer JWT      +--------------+
-Browser ->|   frontend   | ------------------> |   backend    |
-          | (React SPA)  |   REST /api/v1      |  (Fastify)   |
-          +------+-------+                     +------+-------+
-                 | Google OAuth + realtime            | secret key
-                 | (publishable key)                  | (privileged)
-                 v                                    v
-          +---------------------------------------------------+
-          |                     Supabase                      |
-          |   PostgreSQL . Auth (Google) . RLS . Realtime     |
-          +---------------------------------------------------+
-```
+The browser sends its Supabase bearer token to `/api/v1`; it never receives backend credentials or Stripe secrets. Family ID is the tenant ID. Membership and role are independent of subscription state. Product writes recheck all three under database locks; expiration leaves established tenants with authorized read-only history. Frontend queries poll authorized APIs and clear caches when identity or access changes.
 
-- The frontend signs users in with Supabase Google OAuth and sends the resulting JWT as a Bearer token to the backend. It subscribes to Supabase Realtime for live board updates.
-- The backend verifies the JWT against Supabase's JWKS, resolves the caller's family, and performs all privileged writes (the points ledger uses atomic PostgreSQL functions) using the Supabase secret key. Row-level security is a second isolation guarantee for reads.
+## Local start
 
----
+Prerequisites: Node.js 20+, npm, a configured Supabase project, and optionally Docker Compose. Complete [platform setup](docs/setup/platform.md) first, including migrations 001–011 and Auth redirects.
 
-## User flow
-
-Each family has one Owner and optional Manager/Member logins. Login access is separate from participant type.
-
-1. Sign in through `/login` with Google or, when enabled, an email code.
-2. On the first authenticated load, the frontend calls `GET /api/v1/me`, which resolves the verified account to an existing family membership and its OWNER, MANAGER, or MEMBER role. It never creates a family. Unknown accounts see NO_ACCESS; tenant creation is planned in specification 04.
-3. Onboarding. A freshly-created family is "unconfigured" (its `relationship` and `responsible_name` are still empty). The app routes the user to `/onboarding` until they submit the family name, their display name, and their role (`PATCH /api/v1/family`). After that the family counts as configured and the app opens.
-4. Add members (name, type, color, optional birth year).
-5. Create tasks and assign each to a member; move them across the board columns (Backlog -> To Do -> Working).
-6. Complete a task to award its points to the assigned member (atomic ledger write). Reopen reverses the award. The leaderboard and dashboard totals are derived from the ledger.
-7. Create awards and redeem them against a member's balance.
-
-Notes:
-- The responsible user who logs in manages everything (points, awards, members, tasks). There is no per-role gate beyond family ownership.
-- On create, the client sends only user-authored fields; identity and server-owned fields (`family_id`, `created_by_user_id`, `active`, a task's initial `status`) are derived by the backend and must not be sent.
-
----
-
-## Prerequisites
-
-- Node.js 20+ and npm
-- Docker + Docker Compose (optional, for the one-command local run)
-- A Supabase project - see the manual setup below. This is the one piece that cannot live in the repo.
-
----
-
-## One-time Supabase setup (required before the app works)
-
-Everything the apps need in code is in this repo, but a Supabase project must be created in the Supabase dashboard (a web console). This produces the secrets both apps read from env and enables Google login. Do this once:
-
-1. Create the project. Sign in at [supabase.com](https://supabase.com), create a new project, and wait for it to provision.
-2. Grab the keys. In the dashboard, go to Project Settings -> API and copy:
-   - Project URL -> used as `SUPABASE_URL` / `VITE_SUPABASE_URL`
-   - publishable key (`sb_publishable_...`) -> `SUPABASE_PUBLISHABLE_KEY` / `VITE_SUPABASE_PUBLISHABLE_KEY` (safe to expose to the browser; replaces the legacy anon key)
-   - secret key (`sb_secret_...`) -> `SUPABASE_SECRET_KEY` (secret - backend only, never ship to the browser or commit it; replaces the legacy service_role key)
-3. Enable Google OAuth. Go to Authentication -> Providers -> Google, toggle it on, and paste a Google OAuth Client ID and Client Secret (created in the [Google Cloud Console](https://console.cloud.google.com/) under APIs & Services -> Credentials -> OAuth client ID -> Web application). In the Google credential, add Supabase's callback URL (`https://<your-project-ref>.supabase.co/auth/v1/callback`) as an authorized redirect URI. In Authentication -> URL Configuration, set the Site URL to your frontend origin (e.g. `http://localhost:5173` for local dev).
-4. Apply the database schema. Run the SQL migrations and seed in order. The simplest path is the dashboard SQL Editor: open each file under `backend/src/supabase/migrations/` in numeric order (001 -> 011) and run it, then optionally run `backend/src/supabase/seed.sql` for demo data. The backend README also shows how to apply them with psql or the Supabase CLI.
-
-> Why this is manual: creating the project, flipping the Google provider on, and supplying Google's OAuth credentials are account/console/third-party actions. The migrations, API, and auth wiring are all already in code.
-
----
-
-## Quick start (local, with Docker Compose)
-
-The fastest way to run both apps together:
-
-```bash
-cp .env.example .env     # then fill in your Supabase values
+```sh
+cp .env.example .env
+# Fill the root .env with your environment's values.
 docker compose up --build
 ```
 
-- Frontend: http://localhost:5173
-- Backend: http://localhost:8080 (health check at /api/v1/health, API docs at /api/docs)
+Frontend: `http://localhost:5173`. API: `http://localhost:8080/api/v1`. OpenAPI: `http://localhost:8080/api/docs`. For SaaS billing, configure Stripe first and include the worker:
 
-The root `.env` supplies both the backend runtime env and the frontend build args. See `.env.example` for every variable.
-
-## Quick start (local, without Docker)
-
-Run each app in its own terminal. Full details are in each app's README.
-
-```bash
-# Terminal 1 - backend
-cd backend
-cp .env.example .env      # fill in Supabase values
-npm install
-npm run dev               # http://localhost:8080
-
-# Terminal 2 - frontend
-cd frontend
-cp .env.example .env      # fill in Supabase values + VITE_API_URL=http://localhost:8080
-npm install
-npm run dev               # http://localhost:5173
+```sh
+docker compose --profile billing up --build
 ```
 
----
+Compose runs the backend with `NODE_ENV=production`; its public app and legal URLs therefore require HTTPS even on a local machine. Use native development for localhost HTTP billing tests, or use HTTPS development endpoints. The root `.env` configures Compose; native processes use their own app `.env` files.
 
-## Environment variables
+Without Docker, use separate terminals from the repository root:
 
-| Variable | Used by | Secret? | Notes |
-| --- | --- | --- | --- |
-| `SUPABASE_URL` | backend | no | Project URL |
-| `SUPABASE_PUBLISHABLE_KEY` | backend | no | Publishable (public) key, `sb_publishable_...` |
-| `SUPABASE_SECRET_KEY` | backend | **yes** | Secret key `sb_secret_...`; privileged; backend only |
-| `CORS_ORIGIN` | backend | no | Allowed frontend origin(s); no wildcard in production |
-| `PORT` / `NODE_ENV` | backend | no | Defaults to 8080 / development |
-| `VITE_API_URL` | frontend | no | Backend base URL as seen by the browser |
-| `VITE_SUPABASE_URL` | frontend | no | Project URL |
-| `VITE_SUPABASE_PUBLISHABLE_KEY` | frontend | no | Publishable (public) key, baked into the bundle |
-
-The `VITE_*` values are build-time for the frontend (baked into the static bundle), so a rebuild is required whenever they change.
-
----
-
-## Testing
-
-```bash
-cd backend  && npm test   # Fastify suites + 14 fast-check property tests (DB suites skip without TEST_DATABASE_URL)
-cd frontend && npm test   # Vitest + React Testing Library
+```sh
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env
+npm ci --prefix backend
+npm ci --prefix frontend
+npm run dev --prefix backend
+# In another terminal:
+npm run dev --prefix frontend
+# After Stripe configuration, in a third terminal:
+npm run worker:dev --prefix backend
 ```
 
-The backend's database-backed suites skip gracefully unless you point `TEST_DATABASE_URL` at a disposable Postgres. See the backend README for running the full suite against a real database.
+`VITE_*` values are public build-time settings. Restart Vite or rebuild the frontend after changing them. API and worker settings are server-side runtime values; restart both after changes.
 
----
+## User journey
+
+1. Sign in with Google or enabled email OTP. `/me` resolves identity and membership without creating a tenant.
+2. An eligible unassociated user explicitly creates a family when signup is enabled. Reserved or revoked identities cannot create another household.
+3. The Owner completes the profile and purchases the configured plan. A saved draft cannot use product pages.
+4. The worker verifies payment and atomically establishes the same family with an activation receipt. A successful return URL alone grants no access.
+5. Owners/Managers provision participants and optional login access, assign tasks and manage rewards. Members see permitted boards, standings, their points and history.
+6. On entitlement expiry, an established household retains authorized read-only views. The Owner can recover billing; authorized managers can still revoke login access.
+
+## Verification
+
+```sh
+npm test --prefix backend
+npm test --prefix frontend
+npm run typecheck --prefix backend
+npm run typecheck --prefix frontend
+npm run build --prefix backend
+npm run build --prefix frontend
+```
+
+Database tests skip unless `TEST_DATABASE_URL` names a **disposable** PostgreSQL database; the harness drops/rebuilds schemas. See [backend testing](backend/README.md#testing). The merged Specification 6 verification recorded 445 backend and 181 frontend tests; those are historical results, not a claim that provider or production acceptance has been performed in this environment.
 
 ## Deployment
 
-Each app ships its own Dockerfile and can be deployed independently. Step-by-step guides for Vercel, Heroku, and a VPS are in each app's README:
-
-- Backend deployment: see `backend/README.md`
-- Frontend deployment: see `frontend/README.md`
-
-Deploy order that avoids a chicken-and-egg problem:
-
-1. Finish the Supabase setup and apply migrations.
-2. Deploy the backend, note its public URL.
-3. Deploy the frontend with `VITE_API_URL` pointing at that backend URL.
-4. Update the backend's `CORS_ORIGIN` and the Supabase Site URL / redirect URIs to the frontend's public origin.
-
----
+Apply pending migrations once through a tracked migration process, deploy API and supervised worker with matching configuration, then build/deploy the SPA. Configure HTTPS, CORS and Supabase redirects for the deployed origins. Verify Google login, roles, draft isolation, real TEST-account billing and recovery before enabling production signup or checkout. Follow the [platform sequence](docs/setup/platform.md) and [Stripe release steps](docs/setup/stripe.md).
 
 ## Project layout
 
+```text
+backend/src/modules/           Auth, membership, tenant, billing, entitlements and product APIs
+backend/src/supabase/migrations/ SQL migrations 001–011
+backend/src/billing-worker.ts  Billing and entitlement worker/operations CLI
+frontend/src/                 SPA, typed API client and scoped query hooks
+docs/setup/                   Current operator configuration guides
+docs/implementation/          Feature rollout details and implementation evidence
+docs/specifications/          Six feature specifications
+docs/product/                 Product requirements
+docker-compose.yml            API + SPA, optional billing worker profile
 ```
-.
-+- backend/              # Fastify + TypeScript REST API over Supabase
-|  +- src/
-|  |  +- modules/        # auth, family, members, tasks, completions, templates, gamification, dashboard, ops
-|  |  +- middleware/     # auth, context, authorization, error handling
-|  |  +- config/         # env, supabase clients, logger, docs
-|  |  +- supabase/       # SQL migrations 001-011 + seed.sql
-|  +- Dockerfile
-+- frontend/             # React SPA (data-layer migrated off Base44 to a typed REST client)
-|  +- src/
-|  |  +- api/            # typed REST client + per-domain api modules (.ts)
-|  |  +- hooks/          # TanStack Query hooks + realtime
-|  |  +- pages/          # Board, Wall Mode, leaderboard, awards, profiles, onboarding
-|  |  +- lib/            # Supabase client + AuthContext
-|  +- nginx.conf
-|  +- Dockerfile
-+- docker-compose.yml    # runs both apps together
-+- .env.example          # root env for compose
-```
-
----
-
-## License
-
-See LICENSE.
-
-Membership access setup and rollout: [implementation guide](docs/implementation/01-membership-rollout.md).
-
-Email OTP login setup: [specification 02 rollout guide](docs/implementation/02-email-otp-rollout.md).
-
-Member dashboard and history setup: [specification 03 rollout guide](docs/implementation/03-member-dashboard-rollout.md).
-
-Explicit SaaS drafts and legacy compatibility: [specification 04 rollout guide](docs/implementation/04-tenant-onboarding-rollout.md). Signup stays disabled until checkout and entitlement enforcement ship.
-
-Hosted Stripe subscriptions and durable worker configuration: [specification 05 rollout guide](docs/implementation/05-stripe-billing-rollout.md). Checkout remains disabled until approved environment configuration, owned test-account acceptance and specification 06 integration.
-
-Subscription access deployment and recovery: [Specification 06 rollout](docs/implementation/06-subscription-entitlements-rollout.md).

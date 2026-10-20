@@ -1,6 +1,6 @@
 # Specification 3: Member dashboard and history
 
-Date: 2026-10-11 · Status: Design draft · Branch: `codex/member-dashboard-history`
+Date: 2026-10-11 · Status: Implemented and merged; provider/policy rollout remains gated · Branch: `codex/member-dashboard-history`
 
 Depends on [roles](01-tenant-membership-roles.md) and [email login](02-email-otp-login.md). Source: [PRD](../product/PRD-family-access-and-saas.md); [shared conventions](README.md).
 

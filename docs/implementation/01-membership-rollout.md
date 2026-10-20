@@ -4,7 +4,7 @@ Branch: `codex/tenant-membership-roles`. Scope: [specification 01](../specificat
 
 ## Behavior
 
-`GET /api/v1/me` resolves provider-verified identity into an existing membership. It returns NO_ACCESS, REVOKED, READY or ONBOARDING_REQUIRED without creating a family or responsible user. Role is independent of participant type. Existing owners retain their family; additional managers have their own canonical task/completion actor. Members cannot enter the management application and receive an access notice until specification 03.
+`GET /api/v1/me` resolves provider-verified identity into an existing membership. It returns NO_ACCESS, REVOKED, READY or ONBOARDING_REQUIRED without creating a family or responsible user. Role is independent of participant type. Existing owners retain their family; additional managers have their own canonical task/completion actor. Members cannot enter management routes; the merged specification 03 supplies their personal dashboard and authorized read views.
 
 Owner/Manager can provision optional login email and MEMBER/MANAGER role during participant creation, or edit/revoke access separately. Existing claimed mailbox replacement revokes access immediately and issues a hashed, expiring, subject-bound challenge. The person must sign into the same account and complete Supabase mailbox verification before confirming. A delivery failure leaves access revoked; reload the access version and retry. Restoring the old mailbox cancels pending replacement and requires provider verification of that reserved mailbox.
 

@@ -1,6 +1,6 @@
 # Specification 1: Tenant membership and roles
 
-Date: 2026-10-11 · Status: Design draft · Branch: `codex/tenant-membership-roles`
+Date: 2026-10-11 · Status: Implemented and merged; provider/policy rollout remains gated · Branch: `codex/tenant-membership-roles`
 
 Depends on current backend/frontend. Source: [PRD](../product/PRD-family-access-and-saas.md). Shared rules: [specification index](README.md).
 

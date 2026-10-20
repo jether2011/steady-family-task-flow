@@ -1,10 +1,10 @@
 # Family access and SaaS specifications
 
-Date: 2026-10-11 · Status: Implementation design drafts
+Updated: 2026-10-15 · Status: All six implementations merged; deployment acceptance is environment-specific
 
-These six separate specifications implement section 13 of the [PRD](../product/PRD-family-access-and-saas.md). They define a coherent proposed implementation; writing them does not approve unresolved product policies or create implementation branches.
+These six separate specifications implement section 13 of the [PRD](../product/PRD-family-access-and-saas.md). They record the feature designs now implemented in main. Start with the [current setup guides](../README.md) for deployment; merging does not configure providers or approve commercial policy.
 
-| Order | Specification | Planned branch | Depends on |
+| Order | Specification | Implementation branch | Depends on |
 | --- | --- | --- | --- |
 | 1 | [Tenant membership and roles](01-tenant-membership-roles.md) | `codex/tenant-membership-roles` | Current applications |
 | 2 | [Email OTP login](02-email-otp-login.md) | `codex/email-otp-login` | 1 |
@@ -16,7 +16,7 @@ These six separate specifications implement section 13 of the [PRD](../product/P
 ## Shared conventions
 
 - Family ID is the tenant ID. One authentication account has at most one reserved membership, including revoked access; moving to another family requires a future transfer workflow.
-- Owner, Manager and Member are authorization roles, independent of family member type. Proposed Member access is read-only. Owner alone manages billing. Managers may appoint managers but cannot change ownership.
+- Owner, Manager and Member are authorization roles, independent of family member type. Member access is read-only. Owner alone manages billing. Managers may appoint managers but cannot change ownership.
 - Backend routes use `/api/v1`, strict Zod request/response validation, existing `{ error: { code, message } }` errors and server-derived identity. New HTTP codes retain that envelope. DTO timestamps use ISO UTC instants; calendar dates use `YYYY-MM-DD`.
 - API role checks cover privileged repositories. Browser JWTs have no direct table mutation permissions. Harden all SECURITY DEFINER RPC execution grants; a restrictive table policy alone does not block an exposed privileged function.
 - Cross-tenant or private foreign record IDs return `404 NOT_FOUND`; unauthenticated requests return `401 UNAUTHORIZED`; an authenticated caller lacking a same-tenant capability receives `403 FORBIDDEN`.
@@ -36,7 +36,7 @@ These six separate specifications implement section 13 of the [PRD](../product/P
 | Billing customer/subscription, checkout, webhook inbox, portal | 5 |
 | Entitlement projection, write gates, expiry, legacy rollout | 6 |
 
-Each implementation branch changes both projects as needed. Contracts defined in prerequisites are reused, not independently redesigned. Read each document's traceability and completion checklist before considering its feature done.
+The merged implementations update both projects as needed. Contracts defined in prerequisites are reused, not independently redesigned. Read each document's traceability and completion checklist before considering its feature done.
 
 ## PRD coverage
 
@@ -56,7 +56,7 @@ Specification 6 adds a narrow security-only revocation exception during read-onl
 
 ## Decisions still requiring review
 
-Read-only members, manager delegation, global membership reservation, UTC leaderboard semantics, a single monthly Stripe plan, the seven-day renewal grace, restricted read-only access, legacy migration duration, outage tolerance and data retention remain proposed. Price, currency, member cap, tax behavior, merchant account and refund policy are unset. Specifications provide safe gates/placeholders rather than inventing these business values.
+Implemented behavior includes read-only members, manager delegation, single-membership reservation, UTC standings, one monthly plan and established read-only access after expiry. Commercial decisions remain deployment-specific: price, currency, member cap, tax behavior, merchant, refund/retention policy, grace, legacy deadline and outage tolerance. The proposed seven-day grace and other design examples are not runtime defaults. Configure approved values through the environment and publish a versioned policy.
 
 ## Validation for implementation
 

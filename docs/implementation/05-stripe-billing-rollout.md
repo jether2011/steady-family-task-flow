@@ -1,6 +1,6 @@
 # Specification 05: Stripe subscriptions
 
-Branch: `codex/stripe-subscriptions`. Based on `codex/saas-tenant-onboarding` (PR #13), which is required before this branch reaches main. This implementation supplies billing facts and recovery; specification 06 supplies entitlement enforcement and activation. Checkout remains disabled by default.
+Merged implementation: `codex/stripe-subscriptions`, with prerequisites and specification 06 now in main. Billing facts and recovery integrate with entitlement enforcement and atomic activation. Checkout remains disabled by default. Follow the [current Stripe setup sequence](../setup/stripe.md).
 
 ## Implemented flow
 
@@ -10,7 +10,7 @@ Checkout reserves one durable unresolved operation per family under a family/OWN
 
 Signed webhooks use a separate bounded raw-buffer parser outside Supabase authentication. Signature timestamp tolerance is 300 seconds in both directions; the API version, environment and any account reference must match. Acknowledgement follows the durable inbox commit. Duplicate event IDs deduplicate in PostgreSQL. Unsupported events become IGNORED. Only event/type/object/customer references are retained, never raw webhook payloads, card data, signature or payment tokens.
 
-The separate worker processes durable inbox/account leases with monotonic fencing, capped retries and jitter. Idle polling is five seconds. Pending checkouts are scheduled each minute, other known accounts hourly; owner status reads request a rate-limited refresh (once per 30 seconds across instances). Provider latency/backlog requires sufficient worker capacity; monitor oldest pending work. Current subscription lists and invoice/payment objects are retrieved afresh. Unknown customer/session/subscription linkage, unexpected prices, missing subscriptions, multiple nonterminal subscriptions, trials and refund/dispute review conditions quarantine the account. No email-based association is performed.
+The separate worker processes durable inbox/account leases with monotonic fencing, capped retries and jitter. Idle polling is five seconds. Pending checkouts are scheduled each minute, other known accounts hourly; owner status reads request a rate-limited refresh (once per 30 seconds across instances). Provider latency/backlog requires sufficient worker capacity; monitor oldest pending work. Current subscription lists and invoice/payment objects are retrieved afresh. Unknown customer/session/subscription linkage, unexpected prices, missing subscriptions, multiple nonterminal subscriptions, unapproved trials and refund/dispute review conditions quarantine the account. No email-based association is performed.
 
 Paid-through evidence requires automatic collection, a paid invoice, sufficient settled captured PaymentIntent/charge evidence, matching customer/subscription/price and a matching recurring invoice line. Active status and out-of-band/manual payment do not establish payment. Previous verified paid-through facts survive renewal failure. Historical subscriptions remain separate rows; an old cancellation cannot replace a newer active subscription.
 
@@ -30,7 +30,7 @@ Snapshot application and `billing_change_outbox` insertion share a transaction. 
 | `STRIPE_PORTAL_CONFIGURATION_ID` | Active environment-matching portal with payment-method/invoice management, period-end cancellation and subscription updates disabled |
 | `PUBLIC_APP_URL` | Approved frontend origin; HTTPS, with localhost HTTP allowed only outside production |
 | `BILLING_PLAN_TITLE`, `BILLING_PLAN_FEATURES` | Approved title and pipe-separated feature descriptions |
-| `BILLING_MEMBER_LIMIT` | Explicit positive integer or `unlimited`; enforcement belongs to specification 06 |
+| `BILLING_MEMBER_LIMIT` | Explicit positive integer or `unlimited`; enforced by merged specification 06 |
 | `BILLING_CURRENCY` | Approved lowercase Stripe currency; must match the price |
 | `BILLING_TAX_BEHAVIOR` | `inclusive` or `exclusive`, matching the price |
 | `BILLING_AUTOMATIC_TAX` | Explicit `true`/`false` approved tax handling |
@@ -65,11 +65,11 @@ Deploy web and worker with the same merchant/mode configuration. Multiple worker
 
 No checkout enabling or live charging is part of this implementation. First configure an owned TEST merchant, approved product/price/portal and private secrets. Verify product tax behavior, merchant terms/privacy, automatic collection and disabled plan changes/immediate cancellation/trials. Exercise purchase, authentication-required card, decline, abandoned/expired session, webhook before/after return, renewal failure/recovery, portal payment updates, scheduled cancellation and resubscription with Stripe test mode/CLI. Kill/restart the worker during provider response loss and verify the same session/customer are recovered. Verify actual response/event shapes against the pinned version. Record evidence before enabling staged purchase and before any LIVE rollout.
 
-## Specification 06 integration contract
+## Merged entitlement integration
 
-Each `billing_change_outbox` row identifies family, account and monotonic snapshot version. Read recognized subscriptions at that account/version and preserve revoked membership restrictions independently. Quarantined accounts publish no usable new outbox snapshot. In one family-first transaction, specification 06 must project entitlement, establish an eligible SELF_SERVICE family, consume the outbox row and upsert `billing_activation_receipts(account_id,snapshot_version,established_at)`. It must reject stale versions/merchant/mode and keep history.
+Each `billing_change_outbox` row identifies family, account and committed snapshot version. Migration 011 projects recognized payment facts, establishes eligible SELF_SERVICE families and commits the projection, immutable history, outbox consumption and `billing_activation_receipts` atomically under a family-first lock. Revoked memberships remain restricted independently.
 
-Attempt activation is CONFIRMED only with a receipt for the current account version, an established family and no account quarantine. No receipt is written by specification 05. Specification 06 must also update `/me` and the SQL product policy; this branch retains the legacy compatibility policy and unpaid draft boundary. Until that integration exists, even a successful TEST payment stays pending rather than opening a dashboard.
+`billing_accounts.applied_version` identifies the latest committed snapshot; `version` is the provider worker lease fence. Activation is CONFIRMED only with the matching committed receipt, an established family and effective writable access. Polling a new lease does not hide a committed receipt. `/me` and database product policy now use effective entitlements. A successful TEST return alone still grants no access. Missing projection restricts product operations while authenticated owner portal recovery remains available.
 
 ## Operations and recovery
 
